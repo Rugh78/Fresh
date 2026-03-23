@@ -1,0 +1,1135 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FreshList 🛒</title>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:wght@700;900&family=Outfit:wght@400;500;600;700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+/* ── Reset & Base ─────────────────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { height: 100%; overflow-x: hidden; }
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  transition: background .3s, color .3s;
+  -webkit-tap-highlight-color: transparent;
+}
+button { cursor: pointer; font-family: 'Outfit', sans-serif; border: none; }
+button:active { transform: scale(0.97); }
+input:focus { outline: none; }
+a { text-decoration: none; }
+::-webkit-scrollbar { width: 4px; }
+::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
+
+/* ── Theme ───────────────────────────────────────────────────────────────── */
+:root {
+  --bg:         #f0f5eb;
+  --surface:    #ffffff;
+  --surface2:   #e8f0e1;
+  --item-bg:    #ffffff;
+  --item-done:  #f4f8f0;
+  --input-bg:   #f0f5eb;
+  --text:       #1a2e12;
+  --text-muted: #5a7a4a;
+  --accent:     #2d7a1f;
+  --accent2:    #52b33f;
+  --danger:     #d64040;
+  --muted:      #d5e8c8;
+  --border:     #c8ddb8;
+  --shadow:     rgba(0,0,0,0.06);
+  --shadow-lg:  rgba(0,0,0,0.14);
+  --cat-bg:     #f7fbf3;
+  --cat-border: #cfe0bc;
+}
+body.dark {
+  --bg:         #111a0d;
+  --surface:    #1a2614;
+  --surface2:   #22301a;
+  --item-bg:    #1e2c17;
+  --item-done:  #161f11;
+  --input-bg:   #1a2614;
+  --text:       #e2eed8;
+  --text-muted: #7aaa68;
+  --accent:     #52b33f;
+  --accent2:    #7dd668;
+  --danger:     #e05555;
+  --muted:      #273d1c;
+  --border:     #2e4422;
+  --shadow:     rgba(0,0,0,0.3);
+  --shadow-lg:  rgba(0,0,0,0.5);
+  --cat-bg:     #172011;
+  --cat-border: #2a3d1f;
+}
+
+/* ── Pages ───────────────────────────────────────────────────────────────── */
+.page { display: none; min-height: 100vh; }
+.page.active { display: flex; flex-direction: column; }
+
+/* ── Landing ─────────────────────────────────────────────────────────────── */
+#landing {
+  align-items: center;
+  justify-content: center;
+  padding: 48px 28px;
+  text-align: center;
+  gap: 0;
+}
+.landing-bg {
+  position: fixed; inset: 0; z-index: -1;
+  background: radial-gradient(ellipse at 30% 20%, rgba(82,179,63,.15) 0%, transparent 60%),
+              radial-gradient(ellipse at 80% 80%, rgba(45,122,31,.1) 0%, transparent 50%);
+}
+.landing-emoji { font-size: 72px; margin-bottom: 20px; filter: drop-shadow(0 8px 16px rgba(0,0,0,.15)); }
+.landing-title {
+  font-family: 'Fraunces', serif;
+  font-size: 44px; font-weight: 900;
+  color: var(--text); line-height: 1;
+  margin-bottom: 12px;
+}
+.landing-title span { color: var(--accent); }
+.landing-sub {
+  font-size: 16px; color: var(--text-muted);
+  line-height: 1.6; max-width: 260px;
+  margin: 0 auto 48px;
+}
+.landing-actions { width: 100%; max-width: 340px; display: flex; flex-direction: column; gap: 12px; }
+.btn-hero {
+  width: 100%; padding: 18px;
+  background: var(--accent); color: white;
+  border-radius: 18px; font-size: 17px; font-weight: 700;
+  box-shadow: 0 8px 24px rgba(45,122,31,.35);
+  transition: transform .15s, box-shadow .15s;
+}
+.btn-hero:active { transform: scale(0.98); box-shadow: 0 4px 12px rgba(45,122,31,.25); }
+.btn-ghost {
+  width: 100%; padding: 17px;
+  background: var(--surface); color: var(--text);
+  border: 1.5px solid var(--border);
+  border-radius: 18px; font-size: 17px; font-weight: 700;
+}
+.join-panel {
+  width: 100%; max-width: 340px;
+  margin-top: 4px;
+  animation: slideDown .2s ease;
+}
+.join-label { font-size: 11px; font-weight: 700; color: var(--text-muted); letter-spacing: .08em; margin-bottom: 8px; text-align: left; }
+.join-row { display: flex; gap: 10px; }
+.join-input {
+  flex: 1; min-width: 0;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 14px 16px;
+  color: var(--text); font-size: 22px; font-family: 'Outfit', sans-serif;
+  font-weight: 700; letter-spacing: .15em; text-transform: uppercase;
+}
+.btn-join {
+  flex-shrink: 0; background: var(--accent); color: white;
+  border-radius: 14px; padding: 14px 20px;
+  font-weight: 700; font-size: 15px;
+}
+.landing-footer { margin-top: 36px; display: flex; align-items: center; gap: 12px; }
+.btn-dark-landing {
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 50%; width: 44px; height: 44px;
+  font-size: 20px; display: flex; align-items: center; justify-content: center;
+}
+
+/* ── App Header ──────────────────────────────────────────────────────────── */
+#app-header {
+  background: var(--surface);
+  border-bottom: 1.5px solid var(--border);
+  padding: 12px 16px;
+  display: flex; align-items: center; justify-content: space-between;
+  position: sticky; top: 0; z-index: 100;
+  box-shadow: 0 2px 16px var(--shadow);
+  gap: 12px;
+}
+.header-brand { display: flex; align-items: center; gap: 10px; min-width: 0; }
+.header-logo { font-size: 24px; flex-shrink: 0; }
+.header-name {
+  font-family: 'Fraunces', serif;
+  font-size: 20px; font-weight: 700;
+  color: var(--text); line-height: 1;
+}
+.header-meta {
+  font-size: 11px; color: var(--text-muted);
+  font-weight: 600; margin-top: 2px;
+  display: flex; align-items: center; gap: 5px;
+}
+.dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: #f59e0b; flex-shrink: 0;
+  transition: background .4s;
+}
+.dot.on { background: var(--accent2); }
+.header-code { font-weight: 700; letter-spacing: .06em; }
+.header-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; }
+.btn-round {
+  width: 38px; height: 38px; border-radius: 50%;
+  background: var(--surface2); border: none;
+  font-size: 17px; display: flex; align-items: center; justify-content: center;
+}
+.btn-menu-trigger {
+  background: var(--surface2); border: 1.5px solid var(--border);
+  border-radius: 12px; padding: 8px 13px;
+  font-size: 18px; font-weight: 700; letter-spacing: 2px; line-height: 1;
+  color: var(--text);
+}
+
+/* ── Dropdown Menu ───────────────────────────────────────────────────────── */
+.menu-wrap { position: relative; }
+.dropdown {
+  position: absolute; top: calc(100% + 8px); right: 0;
+  background: var(--surface); border: 1.5px solid var(--border);
+  border-radius: 18px; box-shadow: 0 12px 40px var(--shadow-lg);
+  min-width: 220px; z-index: 500;
+  overflow: hidden; display: none;
+  animation: fadeUp .15s ease;
+}
+.dropdown.open { display: block; }
+.dd-item {
+  display: flex; align-items: center; gap: 12px;
+  width: 100%; padding: 14px 18px;
+  background: none; font-size: 15px; font-weight: 600;
+  color: var(--text); text-align: left;
+  transition: background .12s;
+}
+.dd-item:hover { background: var(--surface2); }
+.dd-item.danger { color: var(--danger); }
+.dd-divider { height: 1px; background: var(--border); margin: 4px 14px; }
+.dd-badge {
+  margin-left: auto; background: var(--muted);
+  color: var(--text-muted); font-size: 11px; font-weight: 700;
+  padding: 2px 8px; border-radius: 20px;
+}
+
+/* ── Main Content ────────────────────────────────────────────────────────── */
+#app-body { flex: 1; padding: 20px 16px 40px; max-width: 680px; margin: 0 auto; width: 100%; }
+
+/* ── Input Card ──────────────────────────────────────────────────────────── */
+.input-card {
+  background: var(--surface);
+  border: 1.5px solid var(--border);
+  border-radius: 20px;
+  padding: 18px;
+  margin-bottom: 18px;
+  box-shadow: 0 4px 20px var(--shadow);
+}
+.input-card-label {
+  font-size: 11px; font-weight: 700;
+  color: var(--text-muted); letter-spacing: .08em;
+  margin-bottom: 12px;
+}
+.input-row { display: flex; gap: 10px; margin-bottom: 10px; }
+.main-input {
+  flex: 1; min-width: 0;
+  background: var(--input-bg);
+  border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 13px 16px;
+  color: var(--text); font-size: 15px;
+  font-family: 'Outfit', sans-serif;
+  transition: border-color .2s;
+}
+.main-input:focus { border-color: var(--accent); }
+.main-input::placeholder { color: var(--text-muted); opacity: .7; }
+
+/* Voice button */
+.btn-voice {
+  width: 50px; height: 50px; flex-shrink: 0;
+  border-radius: 14px;
+  background: var(--surface2); border: 1.5px solid var(--border);
+  font-size: 22px; display: flex; align-items: center; justify-content: center;
+  transition: all .2s;
+  position: relative;
+}
+.btn-voice.recording {
+  background: #fee2e2; border-color: var(--danger);
+  animation: pulse 1s infinite;
+}
+.btn-voice.recording::after {
+  content: '';
+  position: absolute; inset: -4px;
+  border-radius: 18px;
+  border: 2px solid var(--danger);
+  animation: ripple 1s infinite;
+}
+@keyframes pulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.05)} }
+@keyframes ripple { 0%{opacity:1;transform:scale(1)} 100%{opacity:0;transform:scale(1.3)} }
+
+.btn-add {
+  width: 100%;
+  background: var(--accent); color: white;
+  border-radius: 14px; padding: 14px;
+  font-size: 16px; font-weight: 700;
+  box-shadow: 0 4px 16px rgba(45,122,31,.3);
+  transition: all .2s;
+}
+.btn-add:disabled {
+  background: var(--muted); color: var(--text-muted);
+  box-shadow: none; cursor: not-allowed;
+}
+.btn-add:not(:disabled):active { transform: scale(0.98); }
+.error-text { margin-top: 10px; color: var(--danger); font-size: 13px; font-weight: 500; display: none; }
+.voice-transcript {
+  margin-top: 8px; font-size: 13px; color: var(--text-muted);
+  font-style: italic; min-height: 18px;
+}
+
+/* ── Progress ────────────────────────────────────────────────────────────── */
+.progress-wrap { margin-bottom: 18px; display: none; }
+.progress-top { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+.progress-info { font-size: 13px; color: var(--text-muted); font-weight: 600; }
+.progress-pct { font-size: 14px; color: var(--accent); font-weight: 700; }
+.progress-track { height: 8px; background: var(--muted); border-radius: 99px; overflow: hidden; }
+.progress-fill {
+  height: 100%; border-radius: 99px;
+  background: linear-gradient(90deg, var(--accent), var(--accent2));
+  transition: width .5s cubic-bezier(.4,0,.2,1);
+  width: 0%;
+}
+.progress-done {
+  text-align: center; margin-top: 10px;
+  font-size: 15px; color: var(--accent); font-weight: 700;
+  display: none;
+}
+
+/* ── Empty State ─────────────────────────────────────────────────────────── */
+.empty {
+  text-align: center; padding: 56px 20px;
+  color: var(--text-muted);
+}
+.empty-icon { font-size: 64px; margin-bottom: 16px; opacity: .8; }
+.empty-title { font-family: 'Fraunces', serif; font-size: 22px; color: var(--text); margin-bottom: 8px; }
+.empty-sub { font-size: 14px; line-height: 1.6; }
+
+/* ── Category Card ───────────────────────────────────────────────────────── */
+.cat-card {
+  background: var(--cat-bg);
+  border: 1.5px solid var(--cat-border);
+  border-radius: 18px; padding: 14px;
+  margin-bottom: 14px;
+  overflow: hidden;
+  animation: fadeUp .25s ease;
+}
+.cat-card.done-card { opacity: .75; }
+.cat-header {
+  display: flex; align-items: center; gap: 8px;
+  padding: 0 4px 10px; margin-bottom: 2px;
+  border-bottom: 1px solid var(--cat-border);
+}
+.cat-name {
+  font-size: 11px; font-weight: 700;
+  letter-spacing: .1em; text-transform: uppercase;
+  color: var(--accent); flex: 1;
+}
+.cat-name.done { color: var(--text-muted); }
+.cat-count {
+  font-size: 11px; font-weight: 700;
+  background: var(--muted); color: var(--text-muted);
+  padding: 2px 9px; border-radius: 20px;
+}
+
+/* ── Item Row ────────────────────────────────────────────────────────────── */
+.item-wrap {
+  position: relative; overflow: hidden;
+  border-radius: 12px; margin-top: 8px;
+}
+.item-bg {
+  position: absolute; inset: 0;
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 0 18px; pointer-events: none; font-size: 20px;
+}
+.item-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 14px;
+  background: var(--item-bg);
+  border-radius: 12px;
+  cursor: pointer;
+  user-select: none; -webkit-user-select: none;
+  position: relative;
+  will-change: transform;
+  transition: transform .25s ease, background .2s ease, opacity .2s ease;
+}
+.item-row.done { background: var(--item-done); opacity: .55; }
+.item-check {
+  width: 24px; height: 24px; border-radius: 50%; flex-shrink: 0;
+  border: 2px solid var(--accent);
+  background: transparent;
+  display: flex; align-items: center; justify-content: center;
+  color: white; font-size: 13px;
+  transition: all .2s ease;
+}
+.item-check.done { background: var(--accent); border-color: var(--accent); }
+.item-emoji { font-size: 22px; flex-shrink: 0; }
+.item-name {
+  flex: 1; min-width: 0;
+  font-size: 15px; font-weight: 500; color: var(--text);
+  overflow-wrap: break-word; line-height: 1.4;
+}
+.item-name.done { text-decoration: line-through; color: var(--text-muted); }
+.item-qty { font-weight: 700; color: var(--accent); margin-right: 4px; }
+.swipe-hint {
+  position: absolute; bottom: 4px; right: 10px;
+  font-size: 9px; color: var(--text-muted); opacity: .35;
+  font-weight: 600; pointer-events: none;
+}
+
+/* ── Qty Panel ───────────────────────────────────────────────────────────── */
+.qty-panel {
+  background: var(--surface2);
+  border: 1.5px solid var(--accent); border-top: 1px solid var(--border);
+  border-radius: 0 0 12px 12px;
+  padding: 12px 14px;
+  display: none; align-items: center;
+  gap: 10px; flex-wrap: wrap;
+}
+.qty-label { font-size: 13px; font-weight: 700; color: var(--text-muted); flex-shrink: 0; }
+.qty-stepper { display: flex; align-items: center; gap: 10px; }
+.qty-btn {
+  width: 32px; height: 32px; border-radius: 8px;
+  border: 1.5px solid var(--border);
+  background: var(--item-bg); color: var(--text);
+  font-size: 18px; display: flex; align-items: center; justify-content: center;
+}
+.qty-val {
+  width: 52px; text-align: center;
+  background: var(--input-bg); border: 1.5px solid var(--border);
+  border-radius: 8px; padding: 6px;
+  color: var(--text); font-size: 16px;
+  font-family: 'Outfit', sans-serif; font-weight: 700;
+}
+.qty-actions { display: flex; gap: 8px; flex: 1; justify-content: flex-end; }
+.btn-save {
+  background: var(--accent); color: white;
+  border-radius: 10px; padding: 8px 18px;
+  font-weight: 700; font-size: 14px;
+}
+.btn-cancel-qty {
+  background: var(--muted); color: var(--text);
+  border-radius: 10px; padding: 8px 14px;
+  font-weight: 600; font-size: 14px;
+}
+
+/* ── Modals ──────────────────────────────────────────────────────────────── */
+.overlay {
+  position: fixed; inset: 0;
+  background: rgba(0,0,0,.5);
+  display: none; z-index: 200;
+  align-items: center; justify-content: center;
+  padding: 24px;
+}
+.overlay.bottom { align-items: flex-end; padding: 0; }
+.overlay.open { display: flex; }
+
+.modal {
+  background: var(--surface);
+  border-radius: 22px; padding: 28px;
+  width: 100%; max-width: 400px;
+  box-shadow: 0 24px 64px var(--shadow-lg);
+}
+.modal.sheet {
+  border-radius: 24px 24px 0 0;
+  padding: 28px 24px 44px;
+  max-width: 520px;
+  animation: slideUp .25s cubic-bezier(.4,0,.2,1);
+}
+.modal-title {
+  font-family: 'Fraunces', serif;
+  font-size: 22px; color: var(--text);
+  margin-bottom: 6px;
+}
+.modal-sub { font-size: 14px; color: var(--text-muted); margin-bottom: 20px; line-height: 1.5; }
+.modal-input {
+  width: 100%;
+  background: var(--input-bg); border: 1.5px solid var(--border);
+  border-radius: 14px; padding: 13px 16px;
+  color: var(--text); font-size: 16px;
+  font-family: 'Outfit', sans-serif;
+  margin-bottom: 16px;
+}
+.modal-input:focus { border-color: var(--accent); }
+.modal-btns { display: flex; gap: 10px; }
+.btn-ok {
+  flex: 1; background: var(--accent); color: white;
+  border-radius: 14px; padding: 14px;
+  font-weight: 700; font-size: 16px;
+}
+.btn-cancel {
+  background: var(--muted); color: var(--text);
+  border-radius: 14px; padding: 14px 20px;
+  font-weight: 600; font-size: 16px;
+}
+.btn-close {
+  width: 100%; background: var(--muted); color: var(--text);
+  border-radius: 14px; padding: 14px;
+  font-weight: 600; font-size: 16px; margin-top: 10px;
+}
+
+/* ── Share Sheet ─────────────────────────────────────────────────────────── */
+.code-box {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+  border-radius: 18px; padding: 20px;
+  text-align: center; margin-bottom: 20px;
+}
+.code-value {
+  font-family: 'Outfit', sans-serif;
+  font-size: 42px; font-weight: 700;
+  color: var(--accent); letter-spacing: .2em;
+}
+.code-hint { font-size: 12px; color: var(--text-muted); margin-top: 6px; }
+.share-btn {
+  display: flex; align-items: center; gap: 16px;
+  width: 100%; border-radius: 16px; padding: 16px 20px;
+  margin-bottom: 10px; cursor: pointer;
+}
+.share-btn.wa { background: #25D366; border: none; }
+.share-btn.lnk {
+  background: var(--surface2);
+  border: 1.5px solid var(--border);
+}
+.share-btn-icon { font-size: 28px; flex-shrink: 0; }
+.share-btn-title { font-weight: 700; font-size: 15px; font-family: 'Outfit', sans-serif; }
+.share-btn.wa .share-btn-title { color: white; }
+.share-btn.lnk .share-btn-title { color: var(--text); }
+.share-btn-sub { font-size: 12px; margin-top: 2px; }
+.share-btn.wa .share-btn-sub { color: rgba(255,255,255,.8); }
+.share-btn.lnk .share-btn-sub { color: var(--text-muted); }
+
+/* ── Templates ───────────────────────────────────────────────────────────── */
+.tpl-list { max-height: 55vh; overflow-y: auto; }
+.tpl-item {
+  display: flex; align-items: center; gap: 12px;
+  background: var(--surface2);
+  border-radius: 14px; padding: 14px 16px;
+  margin-bottom: 10px;
+}
+.tpl-info { flex: 1; min-width: 0; }
+.tpl-name { font-weight: 700; font-size: 15px; color: var(--text); }
+.tpl-meta { font-size: 12px; color: var(--text-muted); margin-top: 2px; }
+.btn-load {
+  background: var(--accent); color: white;
+  border-radius: 10px; padding: 8px 16px;
+  font-weight: 700; font-size: 13px; flex-shrink: 0;
+}
+.btn-del {
+  background: none; font-size: 18px;
+  opacity: .45; flex-shrink: 0;
+}
+.tpl-empty { text-align: center; padding: 32px; color: var(--text-muted); font-size: 14px; }
+
+/* ── Animations ──────────────────────────────────────────────────────────── */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(10px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideDown {
+  from { opacity: 0; transform: translateY(-8px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+@keyframes slideUp {
+  from { transform: translateY(100%); }
+  to   { transform: translateY(0); }
+}
+</style>
+</head>
+<body>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     LANDING PAGE
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="landing" class="page active">
+  <div class="landing-bg"></div>
+  <div class="landing-emoji">🛒</div>
+  <h1 class="landing-title">Fresh<span>List</span></h1>
+  <p class="landing-sub">A live shared grocery list for the whole family — updated in real time</p>
+
+  <div class="landing-actions">
+    <button class="btn-hero" onclick="createList()">✨ Create new list</button>
+    <button class="btn-ghost" onclick="toggleJoin()">🔗 Join existing list</button>
+  </div>
+
+  <div class="join-panel" id="joinPanel" style="display:none">
+    <div class="join-label">ENTER LIST CODE</div>
+    <div class="join-row">
+      <input class="join-input" id="joinInput" placeholder="ABC123" maxlength="8"
+        oninput="this.value=this.value.toUpperCase()"
+        onkeydown="if(event.key==='Enter')joinList()">
+      <button class="btn-join" onclick="joinList()">Join →</button>
+    </div>
+  </div>
+
+  <div class="landing-footer">
+    <button class="btn-dark-landing" onclick="toggleDark()" id="darkBtnLanding">🌙</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MAIN APP
+═══════════════════════════════════════════════════════════════════════════ -->
+<div id="app" class="page">
+
+  <!-- Header -->
+  <header id="app-header">
+    <div class="header-brand">
+      <span class="header-logo">🛒</span>
+      <div>
+        <div class="header-name">FreshList</div>
+        <div class="header-meta">
+          <span class="dot" id="statusDot"></span>
+          <span class="header-code" id="headerCode">—</span>
+          <span id="headerCount"></span>
+        </div>
+      </div>
+    </div>
+    <div class="header-actions">
+      <button class="btn-round" onclick="toggleDark()" id="darkBtnApp">🌙</button>
+      <div class="menu-wrap">
+        <button class="btn-menu-trigger" onclick="toggleMenu()">⋯</button>
+        <div class="dropdown" id="dropdown">
+          <button class="dd-item" onclick="openShare();closeMenu()">🔗 Share list</button>
+          <button class="dd-item" onclick="switchList();closeMenu()">🚪 Switch list</button>
+          <div class="dd-divider"></div>
+          <button class="dd-item" onclick="openTemplates();closeMenu()">
+            📋 Templates <span class="dd-badge" id="tplBadge" style="display:none"></span>
+          </button>
+          <button class="dd-item" onclick="openSaveTpl();closeMenu()">💾 Save as template</button>
+          <div class="dd-divider"></div>
+          <button class="dd-item danger" onclick="clearList();closeMenu()">🗑️ Clear list</button>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Body -->
+  <main id="app-body">
+
+    <!-- Input card -->
+    <div class="input-card">
+      <div class="input-card-label">ADD ITEMS — type or speak, separate with commas</div>
+      <div class="input-row">
+        <input class="main-input" id="itemInput"
+          placeholder='"milk, 3 eggs, apples..."'
+          onkeydown="if(event.key==='Enter')addItems()">
+        <button class="btn-voice" id="voiceBtn" onclick="toggleVoice()" title="Voice input">🎤</button>
+      </div>
+      <div class="voice-transcript" id="voiceTranscript"></div>
+      <button class="btn-add" id="addBtn" onclick="addItems()">+ Add Items</button>
+      <div class="error-text" id="errorMsg"></div>
+    </div>
+
+    <!-- Progress -->
+    <div class="progress-wrap" id="progressWrap">
+      <div class="progress-top">
+        <span class="progress-info" id="progressInfo"></span>
+        <span class="progress-pct" id="progressPct"></span>
+      </div>
+      <div class="progress-track">
+        <div class="progress-fill" id="progressFill"></div>
+      </div>
+      <div class="progress-done" id="progressDone">🎉 All done! Happy shopping!</div>
+    </div>
+
+    <!-- Empty state -->
+    <div class="empty" id="emptyState">
+      <div class="empty-icon">🥦</div>
+      <div class="empty-title">Your list is empty</div>
+      <div class="empty-sub">Type or speak items above<br>and they'll be sorted automatically</div>
+    </div>
+
+    <!-- Items -->
+    <div id="itemsList"></div>
+
+  </main>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     MODALS
+═══════════════════════════════════════════════════════════════════════════ -->
+
+<!-- Save Template -->
+<div class="overlay" id="saveTplOverlay" onclick="if(event.target===this)closeSaveTpl()">
+  <div class="modal">
+    <div class="modal-title">💾 Save Template</div>
+    <div class="modal-sub">Name this list so you can reload it anytime</div>
+    <input class="modal-input" id="tplNameInput" placeholder="e.g. Weekly Essentials"
+      onkeydown="if(event.key==='Enter')saveTemplate()">
+    <div class="modal-btns">
+      <button class="btn-ok" onclick="saveTemplate()">Save</button>
+      <button class="btn-cancel" onclick="closeSaveTpl()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<!-- Templates List -->
+<div class="overlay" id="tplOverlay" onclick="if(event.target===this)closeTemplates()">
+  <div class="modal" style="max-width:460px">
+    <div class="modal-title">📋 Templates</div>
+    <div class="tpl-list" id="tplList"></div>
+    <button class="btn-close" onclick="closeTemplates()">Close</button>
+  </div>
+</div>
+
+<!-- Share Sheet -->
+<div class="overlay bottom" id="shareOverlay" onclick="if(event.target===this)closeShare()">
+  <div class="modal sheet">
+    <div class="modal-title">🔗 Share List</div>
+    <div class="modal-sub">Share this code — your family joins and edits the list live</div>
+    <div class="code-box">
+      <div class="code-value" id="shareCode"></div>
+      <div class="code-hint">Enter this code at the home screen</div>
+    </div>
+    <a class="share-btn wa" id="waBtn" href="#" target="_blank">
+      <span class="share-btn-icon">💬</span>
+      <div>
+        <div class="share-btn-title">Send via WhatsApp</div>
+        <div class="share-btn-sub">Sends the list + live link</div>
+      </div>
+    </a>
+    <button class="share-btn lnk" onclick="copyLink()">
+      <span class="share-btn-icon" id="copyIcon">🔗</span>
+      <div>
+        <div class="share-btn-title" id="copyText">Copy link</div>
+        <div class="share-btn-sub">Direct link — opens straight into this list</div>
+      </div>
+    </button>
+    <button class="btn-close" onclick="closeShare()">Close</button>
+  </div>
+</div>
+
+<!-- ══════════════════════════════════════════════════════════════════════════
+     JAVASCRIPT
+═══════════════════════════════════════════════════════════════════════════ -->
+<script>
+// ── Firebase ──────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey: "AIzaSyD0AIZinI71x3Ka5pPxsQRQxHjtM5XjKyM",
+  authDomain: "freshlist-e9665.firebaseapp.com",
+  databaseURL: "https://freshlist-e9665-default-rtdb.firebaseio.com",
+  projectId: "freshlist-e9665",
+  storageBucket: "freshlist-e9665.firebasestorage.app",
+  messagingSenderId: "292817840517",
+  appId: "1:292817840517:web:23abe961c0ba64d735fcec"
+});
+const db = firebase.database();
+
+// ── Constants ─────────────────────────────────────────────────────────────
+const CATS = [
+  "Produce","Dairy","Bakery","Meat & Seafood",
+  "Frozen","Pantry","Beverages","Snacks",
+  "Household","Personal Care","Other"
+];
+
+// ── State ─────────────────────────────────────────────────────────────────
+let listId   = null;
+let items    = {};
+let dbUnsub  = null;
+let templates = JSON.parse(localStorage.getItem('fl-tpl') || '[]');
+let dark     = localStorage.getItem('fl-dark') === 'true';
+let recognition = null;
+let isRecording = false;
+
+// ── Boot ──────────────────────────────────────────────────────────────────
+window.addEventListener('load', () => {
+  applyDark();
+  setupVoice();
+  const code = new URLSearchParams(location.search).get('list');
+  if (code) enterList(code.toUpperCase());
+});
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.menu-wrap')) closeMenu();
+});
+
+// ── Navigation ────────────────────────────────────────────────────────────
+function showPage(id) {
+  document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+}
+
+function createList() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  const id = Array.from({length:6}, () => chars[Math.floor(Math.random()*chars.length)]).join('');
+  enterList(id);
+}
+
+function toggleJoin() {
+  const p = document.getElementById('joinPanel');
+  p.style.display = p.style.display === 'none' ? 'block' : 'none';
+  if (p.style.display === 'block') setTimeout(() => document.getElementById('joinInput').focus(), 50);
+}
+
+function joinList() {
+  const code = document.getElementById('joinInput').value.trim().toUpperCase();
+  if (code.length >= 4) enterList(code);
+}
+
+function enterList(id) {
+  listId = id;
+  history.replaceState({}, '', `?list=${id}`);
+  document.getElementById('headerCode').textContent = id;
+  document.getElementById('shareCode').textContent = id;
+  showPage('app');
+  subscribe();
+  updateTplBadge();
+}
+
+function switchList() {
+  if (dbUnsub) { dbUnsub(); dbUnsub = null; }
+  listId = null; items = {};
+  history.replaceState({}, '', location.pathname);
+  document.getElementById('joinInput').value = '';
+  document.getElementById('joinPanel').style.display = 'none';
+  showPage('landing');
+}
+
+// ── Firebase ──────────────────────────────────────────────────────────────
+function subscribe() {
+  const r = db.ref(`lists/${listId}/items`);
+  dbUnsub = () => r.off();
+  r.on('value', snap => {
+    document.getElementById('statusDot').classList.add('on');
+    items = snap.val() || {};
+    render();
+  });
+}
+
+async function pushItem(item) {
+  await db.ref(`lists/${listId}/items`).push({
+    name: item.name, quantity: item.quantity || 1,
+    unit: item.unit || '', category: item.category,
+    emoji: item.emoji, checked: false
+  });
+}
+
+function toggleItem(id) {
+  db.ref(`lists/${listId}/items/${id}`).update({ checked: !items[id]?.checked });
+}
+function deleteItem(id) { db.ref(`lists/${listId}/items/${id}`).remove(); }
+function setQty(id, qty) { db.ref(`lists/${listId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
+function clearList() { if (confirm('Clear the entire list?')) db.ref(`lists/${listId}/items`).remove(); }
+
+// ── Add Items ─────────────────────────────────────────────────────────────
+async function addItems() {
+  const input = document.getElementById('itemInput');
+  const val = input.value.trim();
+  if (!val || !listId) return;
+
+  const btn = document.getElementById('addBtn');
+  const err = document.getElementById('errorMsg');
+  btn.disabled = true;
+  btn.textContent = '⏳ Categorizing...';
+  err.style.display = 'none';
+
+  try {
+    const res = await fetch('/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: val })
+    });
+    const result = await res.json();
+    if (!res.ok) throw new Error(result.error || 'Server error');
+    for (const item of result) await pushItem(item);
+    input.value = '';
+    document.getElementById('voiceTranscript').textContent = '';
+    input.focus();
+  } catch (e) {
+    err.textContent = e.message || 'Could not parse items — please try again.';
+    err.style.display = 'block';
+  }
+
+  btn.disabled = false;
+  btn.textContent = '+ Add Items';
+}
+
+// ── Voice Input ───────────────────────────────────────────────────────────
+function setupVoice() {
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  if (!SpeechRecognition) {
+    document.getElementById('voiceBtn').style.display = 'none';
+    return;
+  }
+  recognition = new SpeechRecognition();
+  recognition.continuous = false;
+  recognition.interimResults = true;
+  recognition.lang = 'en-US'; // Change to your language if needed
+
+  recognition.onresult = e => {
+    const transcript = Array.from(e.results).map(r => r[0].transcript).join('');
+    document.getElementById('itemInput').value = transcript;
+    document.getElementById('voiceTranscript').textContent = '🎙 ' + transcript;
+  };
+
+  recognition.onend = () => {
+    isRecording = false;
+    const btn = document.getElementById('voiceBtn');
+    btn.classList.remove('recording');
+    btn.textContent = '🎤';
+  };
+
+  recognition.onerror = () => {
+    isRecording = false;
+    const btn = document.getElementById('voiceBtn');
+    btn.classList.remove('recording');
+    btn.textContent = '🎤';
+  };
+}
+
+function toggleVoice() {
+  if (!recognition) return;
+  if (isRecording) {
+    recognition.stop();
+  } else {
+    isRecording = true;
+    const btn = document.getElementById('voiceBtn');
+    btn.classList.add('recording');
+    btn.textContent = '⏹';
+    document.getElementById('voiceTranscript').textContent = '🎙 Listening...';
+    recognition.start();
+  }
+}
+
+// ── Render ────────────────────────────────────────────────────────────────
+function render() {
+  const arr = Object.entries(items).map(([id, v]) => ({...v, id}));
+  const total = arr.length;
+  const checked = arr.filter(i => i.checked).length;
+
+  // Header
+  document.getElementById('headerCount').textContent = total > 0 ? `· ${checked}/${total}` : '';
+
+  // Progress
+  const pw = document.getElementById('progressWrap');
+  if (total > 0) {
+    pw.style.display = 'block';
+    document.getElementById('progressInfo').textContent = `${checked} of ${total} items`;
+    document.getElementById('progressPct').textContent = `${Math.round(checked/total*100)}%`;
+    document.getElementById('progressFill').style.width = `${checked/total*100}%`;
+    document.getElementById('progressDone').style.display = checked === total ? 'block' : 'none';
+  } else {
+    pw.style.display = 'none';
+  }
+
+  // Empty
+  document.getElementById('emptyState').style.display = total === 0 ? 'block' : 'none';
+
+  // Build list
+  const unchecked = arr.filter(i => !i.checked);
+  const done = arr.filter(i => i.checked);
+  let html = '';
+
+  CATS.forEach(cat => {
+    const its = unchecked.filter(i => i.category === cat);
+    if (!its.length) return;
+    html += `
+      <div class="cat-card">
+        <div class="cat-header">
+          <span class="cat-name">${cat}</span>
+          <span class="cat-count">${its.length}</span>
+        </div>
+        ${its.map(itemHTML).join('')}
+      </div>`;
+  });
+
+  if (done.length) {
+    html += `
+      <div class="cat-card done-card">
+        <div class="cat-header">
+          <span class="cat-name done">✓ Completed</span>
+          <span class="cat-count">${done.length}</span>
+        </div>
+        ${done.map(itemHTML).join('')}
+      </div>`;
+  }
+
+  document.getElementById('itemsList').innerHTML = html;
+  attachSwipe();
+}
+
+function itemHTML(item) {
+  const qty = item.quantity > 1
+    ? `<span class="item-qty">${item.quantity}${item.unit ? ' '+item.unit : ''}×</span>`
+    : '';
+  return `
+    <div class="item-wrap" id="wrap-${item.id}">
+      <div class="item-bg">
+        <span id="he-${item.id}" style="opacity:0">✏️</span>
+        <span id="hd-${item.id}" style="opacity:0">🗑️</span>
+      </div>
+      <div class="item-row${item.checked?' done':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
+        <div class="item-check${item.checked?' done':''}">${item.checked?'✓':''}</div>
+        <span class="item-emoji">${item.emoji}</span>
+        <span class="item-name${item.checked?' done':''}">${qty}${item.name}</span>
+      </div>
+      <div class="swipe-hint">← delete · edit →</div>
+      <div class="qty-panel" id="qp-${item.id}">
+        <span class="qty-label">Qty</span>
+        <div class="qty-stepper">
+          <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',-1)">−</button>
+          <input class="qty-val" id="qi-${item.id}" type="number" min="1" value="${item.quantity}"
+            onkeydown="if(event.key==='Enter')saveQty('${item.id}')">
+          <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',1)">+</button>
+        </div>
+        <div class="qty-actions">
+          <button class="btn-save" onclick="event.stopPropagation();saveQty('${item.id}')">✓ Save</button>
+          <button class="btn-cancel-qty" onclick="event.stopPropagation();closeQty('${item.id}')">Cancel</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+function adj(id, d) {
+  const inp = document.getElementById(`qi-${id}`);
+  if (inp) inp.value = Math.max(1, parseInt(inp.value||1)+d);
+}
+function saveQty(id) {
+  setQty(id, document.getElementById(`qi-${id}`)?.value);
+  closeQty(id);
+}
+function openQty(id) {
+  document.getElementById(`qp-${id}`)?.style && (document.getElementById(`qp-${id}`).style.display = 'flex');
+  const w = document.getElementById(`wrap-${id}`);
+  if (w) w.style.borderRadius = '12px 12px 0 0';
+}
+function closeQty(id) {
+  document.getElementById(`qp-${id}`)?.style && (document.getElementById(`qp-${id}`).style.display = 'none');
+  const w = document.getElementById(`wrap-${id}`);
+  if (w) w.style.borderRadius = '12px';
+}
+
+// ── Swipe ─────────────────────────────────────────────────────────────────
+function attachSwipe() {
+  Object.keys(items).forEach(id => {
+    const row = document.getElementById(`row-${id}`);
+    if (!row) return;
+    let sx = null, cx = 0;
+    const T = 60;
+
+    row.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, {passive:true});
+    row.addEventListener('touchmove', e => {
+      if (sx === null) return;
+      cx = e.touches[0].clientX - sx;
+      const cl = Math.max(-80, Math.min(80, cx));
+      row.style.transition = 'none';
+      row.style.transform = `translateX(${cl}px)`;
+      const p = cl / 80;
+      const he = document.getElementById(`he-${id}`);
+      const hd = document.getElementById(`hd-${id}`);
+      if (he) he.style.opacity = Math.max(0, p);
+      if (hd) hd.style.opacity = Math.max(0, -p);
+      row.style.background = cl < -20
+        ? `rgba(214,64,64,${Math.min(.18,Math.abs(cl)/200)})`
+        : cl > 20 ? `rgba(45,122,31,${Math.min(.18,cl/200)})` : '';
+    }, {passive:true});
+
+    row.addEventListener('touchend', () => {
+      row.style.transition = 'transform .25s ease, background .2s ease';
+      row.style.transform = 'translateX(0)';
+      row.style.background = '';
+      ['he','hd'].forEach(p => { const el = document.getElementById(`${p}-${id}`); if(el) el.style.opacity=0; });
+      if (cx > T) openQty(id);
+      else if (cx < -T) deleteItem(id);
+      sx = null; cx = 0;
+    });
+  });
+}
+
+// ── Dark Mode ─────────────────────────────────────────────────────────────
+function applyDark() {
+  document.body.classList.toggle('dark', dark);
+  const icon = dark ? '☀️' : '🌙';
+  document.querySelectorAll('#darkBtnLanding,#darkBtnApp').forEach(b => b.textContent = icon);
+}
+function toggleDark() {
+  dark = !dark;
+  localStorage.setItem('fl-dark', dark);
+  applyDark();
+}
+
+// ── Menu ──────────────────────────────────────────────────────────────────
+function toggleMenu() { document.getElementById('dropdown').classList.toggle('open'); }
+function closeMenu()  { document.getElementById('dropdown').classList.remove('open'); }
+
+// ── Templates ─────────────────────────────────────────────────────────────
+function updateTplBadge() {
+  const el = document.getElementById('tplBadge');
+  el.style.display = templates.length ? 'inline' : 'none';
+  el.textContent = templates.length;
+}
+function openSaveTpl() {
+  document.getElementById('saveTplOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('tplNameInput').focus(), 100);
+}
+function closeSaveTpl() {
+  document.getElementById('saveTplOverlay').classList.remove('open');
+  document.getElementById('tplNameInput').value = '';
+}
+function saveTemplate() {
+  const name = document.getElementById('tplNameInput').value.trim();
+  if (!name) return;
+  templates.push({ name, items: Object.values(items).map(v => ({...v, checked:false})), date: Date.now() });
+  localStorage.setItem('fl-tpl', JSON.stringify(templates));
+  updateTplBadge();
+  closeSaveTpl();
+}
+function openTemplates() {
+  const el = document.getElementById('tplList');
+  el.innerHTML = templates.length
+    ? templates.map((t,i) => `
+        <div class="tpl-item">
+          <div class="tpl-info">
+            <div class="tpl-name">${t.name}</div>
+            <div class="tpl-meta">${t.items.length} items · ${new Date(t.date).toLocaleDateString()}</div>
+          </div>
+          <button class="btn-load" onclick="loadTemplate(${i})">Load</button>
+          <button class="btn-del" onclick="delTemplate(${i})">🗑️</button>
+        </div>`).join('')
+    : '<div class="tpl-empty">No templates yet.<br>Save a list to reuse it!</div>';
+  document.getElementById('tplOverlay').classList.add('open');
+}
+function closeTemplates() { document.getElementById('tplOverlay').classList.remove('open'); }
+async function loadTemplate(i) {
+  await db.ref(`lists/${listId}/items`).remove();
+  for (const item of templates[i].items) await pushItem(item);
+  closeTemplates();
+}
+function delTemplate(i) {
+  templates.splice(i, 1);
+  localStorage.setItem('fl-tpl', JSON.stringify(templates));
+  updateTplBadge();
+  openTemplates();
+}
+
+// ── Share ─────────────────────────────────────────────────────────────────
+function getUrl() { return `${location.origin}${location.pathname}?list=${listId}`; }
+
+function openShare() {
+  const lines = [`🛒 *FreshList — Code: ${listId}*\n`];
+  CATS.forEach(cat => {
+    const its = Object.values(items).filter(i => i.category===cat && !i.checked);
+    if (its.length) {
+      lines.push(`*${cat}*`);
+      its.forEach(i => lines.push(`${i.emoji} ${i.quantity>1?i.quantity+'× ':''}${i.name}`));
+      lines.push('');
+    }
+  });
+  lines.push(`📲 Open & edit live: ${getUrl()}`);
+  document.getElementById('waBtn').href = `https://wa.me/?text=${encodeURIComponent(lines.join('\n'))}`;
+  document.getElementById('shareOverlay').classList.add('open');
+}
+function closeShare() { document.getElementById('shareOverlay').classList.remove('open'); }
+function copyLink() {
+  navigator.clipboard.writeText(getUrl()).then(() => {
+    document.getElementById('copyIcon').textContent = '✅';
+    document.getElementById('copyText').textContent = 'Link copied!';
+    setTimeout(() => {
+      document.getElementById('copyIcon').textContent = '🔗';
+      document.getElementById('copyText').textContent = 'Copy link';
+    }, 2000);
+  });
+}
+</script>
+</body>
+</html>
