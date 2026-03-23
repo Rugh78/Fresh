@@ -305,7 +305,7 @@
 </div>
 
 <script>
-// ── Firebase ──────────────────────────────────────────────────────────────────
+// ── Firebase Config ──
 firebase.initializeApp({
   apiKey: "AIzaSyD0AIZinI71x3Ka5pPxsQRQxHjtM5XjKyM",
   authDomain: "freshlist-e9665.firebaseapp.com",
@@ -317,13 +317,11 @@ firebase.initializeApp({
 });
 const db = firebase.database();
 
-// ── Constants & State ─────────────────────────────────────────────────────────
 const CATS = ["Produce","Dairy","Bakery","Meat & Seafood","Frozen","Pantry","Beverages","Snacks","Household","Personal Care","Other"];
 let listId = null, items = {}, dbUnsub = null;
 let templates = JSON.parse(localStorage.getItem('fl-tpl') || '[]');
 let dark = localStorage.getItem('fl-dark') === 'true';
 
-// ── Boot ──────────────────────────────────────────────────────────────────────
 window.addEventListener('load', () => {
   applyDark();
   const code = new URLSearchParams(window.location.search).get('list');
@@ -331,7 +329,6 @@ window.addEventListener('load', () => {
 });
 document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeMenu(); });
 
-// ── Pages ─────────────────────────────────────────────────────────────────────
 function showPage(id) {
   document.querySelectorAll('.page').forEach(p => p.classList.remove('active'));
   document.getElementById(id).classList.add('active');
@@ -374,7 +371,6 @@ function switchList() {
   showPage('landing');
 }
 
-// ── Firebase Operations ─────────────────────────────────────────────────────────
 function subscribeToList() {
   const r = db.ref(`lists/${listId}/items`);
   dbUnsub = () => r.off();
@@ -400,7 +396,7 @@ function deleteItem(id) { db.ref(`lists/${listId}/items/${id}`).remove(); }
 function updateQty(id, qty) { db.ref(`lists/${listId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
 function clearList() { if (confirm('Clear the entire list?')) db.ref(`lists/${listId}/items`).remove(); }
 
-// ── AI Integration via Cloudflare Function ──────────────────────────────────
+// ── FIXED AI Integration ──
 async function addItems() {
   const input = document.getElementById('itemInput');
   const val = input.value.trim();
@@ -413,28 +409,28 @@ async function addItems() {
   err.style.display = 'none';
   
   try {
-    // UPDATED: Pointing to Cloudflare Pages Functions endpoint
+    // 1. Point to standard Cloudflare Functions path
     const res = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ text: val })
     });
 
+    // 2. SAFETY CHECK: Catch 404/500 errors before parsing
     if (!res.ok) {
-       // If the function returns a 404 or 500, we catch it here before parsing JSON
        const errorData = await res.text();
-       throw new Error(`Server returned ${res.status}: ${errorData}`);
+       throw new Error(`Server returned ${res.status}. Check Function deployment.`);
     }
 
     const parsed = await res.json();
-    if (!Array.isArray(parsed)) throw new Error("Invalid AI response format");
+    if (!Array.isArray(parsed)) throw new Error("Invalid AI format received");
 
     for (const item of parsed) await pushItem(item);
     input.value = '';
     input.focus();
   } catch (e) {
     console.error("Fetch Error:", e);
-    err.textContent = 'Connection error. Check your API key and Function deployment.';
+    err.textContent = e.message;
     err.style.display = 'block';
   } finally {
     btn.disabled = false; 
@@ -442,7 +438,6 @@ async function addItems() {
   }
 }
 
-// ── Render ────────────────────────────────────────────────────────────────────
 function renderList() {
   const arr = Object.entries(items).map(([id, v]) => ({...v, id}));
   const total = arr.length;
@@ -536,7 +531,6 @@ function closeQty(id) {
   if (w) w.style.borderRadius = '12px';
 }
 
-// ── Swipe Interactions ──────────────────────────────────────────────────────────
 function attachSwipe() {
   Object.keys(items).forEach(id => {
     const row = document.getElementById(`row-${id}`);
@@ -575,7 +569,6 @@ function attachSwipe() {
   });
 }
 
-// ── Dark mode ─────────────────────────────────────────────────────────────────
 function applyDark() {
   document.body.classList.toggle('dark', dark);
   const icon = dark ? '☀️' : '🌙';
@@ -587,11 +580,9 @@ function toggleDark() {
   applyDark();
 }
 
-// ── Menu ──────────────────────────────────────────────────────────────────────
 function toggleMenu() { document.getElementById('menuDropdown').classList.toggle('open'); }
 function closeMenu() { document.getElementById('menuDropdown').classList.remove('open'); }
 
-// ── Templates ─────────────────────────────────────────────────────────────────
 function updateTplCount() {
   const el = document.getElementById('tplCount');
   el.style.display = templates.length ? 'inline' : 'none';
@@ -636,7 +627,6 @@ function delTemplate(i) {
   updateTplCount(); openTemplates();
 }
 
-// ── Share Features ──────────────────────────────────────────────────────────────
 function getUrl() { return `${location.origin}${location.pathname}?list=${listId}`; }
 function openShare() {
   const lines = [`🛒 *FreshList — Code: ${listId}*\n`];
@@ -661,4 +651,4 @@ function copyLink() {
 }
 </script>
 </body>
-  </html>
+</html>
