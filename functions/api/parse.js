@@ -4,16 +4,11 @@ export async function onRequestPost(context) {
   try {
     const { text } = await request.json();
 
-    // The prompt ensures the AI returns ONLY the JSON array we need
-    const prompt = `Parse this grocery input into a structured JSON array. 
-    Input: "${text}"
-    
+    // 1. Precise prompt for Google Gemini
+    const prompt = `Parse this grocery input: "${text}". 
     Return ONLY a JSON array. Each object must have:
-    {"name":"item name","quantity":number,"unit":"string or empty","category":"Produce|Dairy|Bakery|Meat & Seafood|Frozen|Pantry|Beverages|Snacks|Household|Personal Care|Other","emoji":"single emoji"}
-    
-    Strictly follow the category list provided.`;
+    {"name":"item name","quantity":number,"unit":"string or empty","category":"Produce|Dairy|Bakery|Meat & Seafood|Frozen|Pantry|Beverages|Snacks|Household|Personal Care|Other","emoji":"single emoji"}`;
 
-    // Google Gemini API Endpoint
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GOOGLE_API_KEY}`;
 
     const response = await fetch(url, {
@@ -25,16 +20,13 @@ export async function onRequestPost(context) {
     });
 
     if (!response.ok) {
-      const errorData = await response.text();
-      return new Response(JSON.stringify({ error: "Google API Error", details: errorData }), { status: 500 });
+      return new Response(JSON.stringify({ error: "Google API failed" }), { status: 500 });
     }
 
     const data = await response.json();
     
-    // Extract the text from Gemini's response structure
+    // 2. Clean the AI response (Google often wraps JSON in code blocks)
     let rawText = data.candidates[0].content.parts[0].text;
-    
-    // Clean up any markdown code blocks the AI might include
     const cleanJson = rawText.replace(/```json|```/g, '').trim();
     
     return new Response(cleanJson, {
