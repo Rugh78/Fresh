@@ -2,54 +2,33 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    // 1. Is the key actually there?
+    // Check if the key is actually reaching the code
     if (!env.GOOGLE_API_KEY) {
-      return new Response(
-        JSON.stringify({ error: "API Key missing! IMPORTANT: Go to 'Deployments' tab and click 'Retry Deployment'." }), 
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      return new Response(JSON.stringify({ error: "API Key missing! Step: Go to Deployments > Click 'Retry Deployment'." }), { status: 500 });
     }
 
     const { text } = await request.json();
-
-    // 2. The stable 1.5 Flash endpoint
     const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${env.GOOGLE_API_KEY}`;
-
-    const prompt = `Parse this grocery input: "${text}". 
-    Return ONLY a JSON array. Each object must have:
-    {"name":"item name","quantity":number,"unit":"string or empty","category":"Produce|Dairy|Bakery|Meat & Seafood|Frozen|Pantry|Beverages|Snacks|Household|Personal Care|Other","emoji":"single emoji"}`;
 
     const response = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        contents: [{ parts: [{ text: prompt }] }]
+        contents: [{ parts: [{ text: `Return ONLY a JSON array of items from: "${text}". Format: [{"name":"item","quantity":1,"unit":"","category":"Produce","emoji":"🍎"}]` }] }]
       })
     });
 
-    // 3. Capture the REAL error from Google
+    // If Google rejects us, this will now tell us WHY (e.g., "Invalid Key")
     if (!response.ok) {
-      const errorText = await response.text();
-      return new Response(
-        JSON.stringify({ error: `Google API rejected us: ${errorText}` }), 
-        { status: 500, headers: { 'Content-Type': 'application/json' } }
-      );
+      const errorDetail = await response.text();
+      return new Response(JSON.stringify({ error: `Google API Error: ${errorDetail}` }), { status: 500 });
     }
 
     const data = await response.json();
-    
-    // 4. Clean the response
-    let rawText = data.candidates[0].content.parts[0].text;
-    const cleanJson = rawText.replace(/```json|```/g, '').trim();
-    
-    return new Response(cleanJson, {
-      headers: { 'Content-Type': 'application/json' }
-    });
+    const aiText = data.candidates[0].content.parts[0].text.replace(/```json|```/g, '').trim();
+    return new Response(aiText, { headers: { 'Content-Type': 'application/json' } });
 
   } catch (err) {
-    return new Response(
-      JSON.stringify({ error: `Code Crash: ${err.message}` }), 
-      { status: 500, headers: { 'Content-Type': 'application/json' } }
-    );
+    return new Response(JSON.stringify({ error: `Crash: ${err.message}` }), { status: 500 });
   }
 }
