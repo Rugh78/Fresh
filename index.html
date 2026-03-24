@@ -1,176 +1,97 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>FreshList 🛒</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-  <style>
-    :root {
-      --bg:#f4f7f0; --surface:#fff; --text:#1e2d18; --accent:#3d8c2b;
-      --border:#d4e5cc; --muted:#6a8a60; --item-bg:#fff;
-    }
-    body.dark {
-      --bg:#131a10; --surface:#1c2619; --text:#e8f0e4; --accent:#5fba4a;
-      --border:#2e3d2a; --muted:#7a9e72; --item-bg:#253121;
-    }
-    * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 20px; transition: 0.3s; }
-    .container { max-width: 500px; margin: 0 auto; }
-    h1 { font-family: 'Playfair Display'; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
-    .card { background: var(--surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-    input { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 16px; margin-bottom: 10px; }
-    button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer; transition: 0.2s; }
-    button:active { transform: scale(0.98); }
-    .item-row { display: flex; align-items: center; background: var(--item-bg); padding: 12px; border-radius: 10px; margin-bottom: 6px; border: 1px solid var(--border); gap: 12px; }
-    .item-row.checked { opacity: 0.5; background: var(--bg); }
-    .cat-label { font-size: 11px; font-weight: 800; color: var(--accent); margin: 15px 0 8px 5px; text-transform: uppercase; letter-spacing: 1px; }
-    .modal { display:none; position:fixed; top:0; left:0; width:100%; height:100%; background:rgba(0,0,0,0.5); align-items:center; justify-content:center; padding:20px; z-index:100; }
-    .modal.open { display:flex; }
-    .modal-content { background:var(--surface); padding:25px; border-radius:20px; width:100%; max-width:400px; }
-    .error { color: #e05555; font-size: 13px; margin-top: 10px; font-weight: 600; }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>FreshList 🛒</title>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+    <style>
+        :root { --bg: #f4f7f0; --surface: #fff; --text: #1e2d18; --accent: #3d8c2b; --border: #d4e5cc; }
+        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
+        .container { max-width: 500px; margin: 0 auto; }
+        .card { background: var(--surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; font-size: 16px; }
+        button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--accent); color: white; font-weight: bold; cursor: pointer; }
+        .error { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 13px; display: none; border: 1px solid #f1998e; }
+        .item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); gap: 10px; }
+    </style>
 </head>
 <body>
-  <div class="container">
-    <h1>FreshList 🛒 <span onclick="toggleDark()" style="cursor:pointer; font-size:20px;">🌓</span></h1>
-
-    <div id="welcome" class="card">
-      <button onclick="createList()">✨ Create New List</button>
-      <div style="margin:15px 0; text-align:center; opacity:0.5;">— or —</div>
-      <input id="joinId" placeholder="Enter List Code (e.g. AB123)">
-      <button style="background:var(--muted); color:var(--text)" onclick="joinList()">Join List</button>
-    </div>
-
-    <div id="app" style="display:none;">
-      <div class="card">
-        <div style="display:flex; justify-content:space-between; margin-bottom:15px;">
-          <span id="displayId" style="font-weight:700; color:var(--accent)"></span>
-          <span onclick="openShare()" style="cursor:pointer; font-size:14px; font-weight:600;">🔗 Share</span>
+    <div class="container">
+        <h1 id="title">FreshList 🛒</h1>
+        <div class="card">
+            <input id="itemInput" placeholder="Milk, eggs, 2 apples..." onkeydown="if(event.key==='Enter')addItems()">
+            <button id="addBtn" onclick="addItems()">Add to List</button>
+            <div id="errorBox" class="error"></div>
         </div>
-        <input id="input" placeholder="Type items (e.g. milk, 2 apples)..." onkeydown="if(event.key==='Enter')addItems()">
-        <button id="addBtn" onclick="addItems()">Add Items</button>
-        <div id="err" class="error" style="display:none;"></div>
-      </div>
-      <div id="list"></div>
-      <button style="margin-top:20px; background:var(--muted); color:var(--text)" onclick="openTemplates()">📋 Use Template</button>
+        <div id="listContainer"></div>
     </div>
-  </div>
 
-  <div id="shareModal" class="modal">
-    <div class="modal-content">
-      <h3 style="margin-bottom:15px;">Share List</h3>
-      <button onclick="copyLink()" id="copyBtn">📋 Copy Direct Link</button>
-      <button style="background:#25D366; margin-top:10px;" onclick="shareWhatsApp()">📱 WhatsApp List</button>
-      <button style="background:none; color:var(--text); margin-top:10px;" onclick="closeModals()">Close</button>
-    </div>
-  </div>
+    <script>
+        // 1. INITIALIZE FIREBASE
+        const firebaseConfig = {
+            databaseURL: "https://freshlist-e9665-default-rtdb.firebaseio.com", // Double check this!
+            projectId: "freshlist-e9665"
+        };
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
 
-  <script>
-    // --- 1. FIREBASE SETUP ---
-    const firebaseConfig = {
-      apiKey: "AIzaSyD0AIZinI71x3Ka5pPxsQRQxHjtM5XjKyM", 
-      databaseURL: "https://freshlist-e9665-default-rtdb.firebaseio.com",
-      projectId: "freshlist-e9665"
-    };
-    firebase.initializeApp(firebaseConfig);
-    const db = firebase.database();
+        // 2. GET LIST ID FROM URL
+        const urlParams = new URLSearchParams(window.location.search);
+        let listId = urlParams.get('list') || 'DEMO';
+        document.getElementById('title').innerText = `List: ${listId} 🛒`;
 
-    let listId = null;
-    const CATS = ["Produce","Dairy","Bakery","Meat & Seafood","Frozen","Pantry","Beverages","Snacks","Household","Personal Care","Other"];
-
-    // --- 2. CORE LOGIC ---
-    function createList() {
-      listId = Math.random().toString(36).substring(2, 7).toUpperCase();
-      window.history.pushState({}, '', `?list=${listId}`);
-      start();
-    }
-
-    function joinList() {
-      listId = document.getElementById('joinId').value.trim().toUpperCase();
-      if(listId) { window.history.pushState({}, '', `?list=${listId}`); start(); }
-    }
-
-    function start() {
-      document.getElementById('welcome').style.display = 'none';
-      document.getElementById('app').style.display = 'block';
-      document.getElementById('displayId').textContent = `Code: ${listId}`;
-      db.ref(`lists/${listId}/items`).on('value', snap => render(snap.val() || {}));
-    }
-
-    async function addItems() {
-      const input = document.getElementById('input');
-      const btn = document.getElementById('addBtn');
-      const err = document.getElementById('err');
-      if (!input.value.trim()) return;
-
-      btn.disabled = true; btn.textContent = "AI is sorting..."; err.style.display = 'none';
-
-      try {
-        const res = await fetch('/api/parse', { 
-          method: 'POST', 
-          body: JSON.stringify({ text: input.value }) 
+        // 3. SYNC WITH DATABASE
+        db.ref(`lists/${listId}/items`).on('value', (snapshot) => {
+            const data = snapshot.val() || {};
+            const container = document.getElementById('listContainer');
+            container.innerHTML = "";
+            Object.entries(data).forEach(([id, item]) => {
+                container.innerHTML += `<div class="item">${item.emoji || '📦'} ${item.name}</div>`;
+            });
         });
-        if (!res.ok) throw new Error(await res.text());
-        
-        const items = await res.json();
-        items.forEach(item => {
-          db.ref(`lists/${listId}/items`).push({ ...item, checked: false });
-        });
-        input.value = "";
-      } catch (e) {
-        err.textContent = "Error: " + e.message; err.style.display = 'block';
-      } finally {
-        btn.disabled = false; btn.textContent = "Add Items";
-      }
-    }
 
-    function render(items) {
-      const container = document.getElementById('list');
-      container.innerHTML = "";
-      const arr = Object.entries(items).map(([id, val]) => ({ id, ...val }));
+        // 4. ADD ITEMS (AI PARSING)
+        async function addItems() {
+            const input = document.getElementById('itemInput');
+            const btn = document.getElementById('addBtn');
+            const errBox = document.getElementById('errorBox');
+            
+            if (!input.value.trim()) return;
+            
+            btn.disabled = true;
+            btn.innerText = "Categorizing...";
+            errBox.style.display = 'none';
 
-      CATS.forEach(cat => {
-        const catItems = arr.filter(i => i.category === cat);
-        if (catItems.length === 0) return;
-        container.innerHTML += `<div class="cat-label">${cat}</div>`;
-        catItems.forEach(item => {
-          container.innerHTML += `
-            <div class="item-row ${item.checked ? 'checked' : ''}" onclick="toggleItem('${item.id}', ${item.checked})">
-              <input type="checkbox" ${item.checked ? 'checked' : ''} style="width:20px; height:20px;">
-              <span style="flex-grow:1">${item.emoji} ${item.name}</span>
-              <span style="opacity:0.3" onclick="event.stopPropagation(); db.ref('lists/${listId}/items/${item.id}').remove()">✕</span>
-            </div>`;
-        });
-      });
-    }
+            try {
+                const response = await fetch('/api/parse', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ text: input.value })
+                });
 
-    function toggleItem(id, current) {
-      db.ref(`lists/${listId}/items/${id}`).update({ checked: !current });
-    }
+                const result = await response.json();
 
-    // --- 3. UTILITIES ---
-    function toggleDark() { document.body.classList.toggle('dark'); }
-    function openShare() { document.getElementById('shareModal').classList.add('open'); }
-    function closeModals() { document.querySelectorAll('.modal').forEach(m => m.classList.remove('open')); }
-    function copyLink() {
-      navigator.clipboard.writeText(window.location.href);
-      document.getElementById('copyBtn').textContent = "✅ Link Copied!";
-      setTimeout(() => document.getElementById('copyBtn').textContent = "📋 Copy Direct Link", 2000);
-    }
-    function shareWhatsApp() {
-      window.open(`https://wa.me/?text=${encodeURIComponent("Check our grocery list: " + window.location.href)}`);
-    }
+                if (!response.ok) {
+                    // This will now show the REAL error from the server
+                    throw new Error(result.error || "Unknown Server Error");
+                }
 
-    // Check for list ID in URL on load
-    const urlParams = new URLSearchParams(window.location.search);
-    if (urlParams.has('list')) {
-      listId = urlParams.get('list').toUpperCase();
-      start();
-    }
-  </script>
+                result.forEach(item => {
+                    db.ref(`lists/${listId}/items`).push(item);
+                });
+                
+                input.value = "";
+            } catch (err) {
+                errBox.innerText = "⚠️ " + err.message;
+                errBox.style.display = 'block';
+            } finally {
+                btn.disabled = false;
+                btn.innerText = "Add to List";
+            }
+        }
+    </script>
 </body>
 </html>
