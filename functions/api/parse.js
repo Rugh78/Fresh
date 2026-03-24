@@ -2,10 +2,10 @@ export async function onRequestPost(context) {
   const { request, env } = context;
 
   try {
-    // 1. Check if the API Key is actually reaching the code
+    // 1. Is the key actually there?
     if (!env.GOOGLE_API_KEY) {
       return new Response(
-        JSON.stringify({ error: "API Key is missing from Cloudflare! Go to Settings > Environment Variables, add GOOGLE_API_KEY, then you MUST go to the Deployments tab and click 'Retry Deployment'." }), 
+        JSON.stringify({ error: "API Key missing! IMPORTANT: Go to 'Deployments' tab and click 'Retry Deployment'." }), 
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
@@ -27,18 +27,18 @@ export async function onRequestPost(context) {
       })
     });
 
-    // 3. The Debug Shield: If Google rejects us, this will show the REAL reason in your app
+    // 3. Capture the REAL error from Google
     if (!response.ok) {
       const errorText = await response.text();
       return new Response(
-        JSON.stringify({ error: `Google API Error: ${errorText}` }), 
+        JSON.stringify({ error: `Google API rejected us: ${errorText}` }), 
         { status: 500, headers: { 'Content-Type': 'application/json' } }
       );
     }
 
     const data = await response.json();
     
-    // 4. Clean and return the AI text
+    // 4. Clean the response
     let rawText = data.candidates[0].content.parts[0].text;
     const cleanJson = rawText.replace(/```json|```/g, '').trim();
     
@@ -48,7 +48,7 @@ export async function onRequestPost(context) {
 
   } catch (err) {
     return new Response(
-      JSON.stringify({ error: `Function Crash: ${err.message}` }), 
+      JSON.stringify({ error: `Code Crash: ${err.message}` }), 
       { status: 500, headers: { 'Content-Type': 'application/json' } }
     );
   }
