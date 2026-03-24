@@ -1,108 +1,167 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>FreshList 🛒</title>
-    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;700&display=swap" rel="stylesheet">
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
-    <style>
-        :root { --bg: #f4f7f0; --surface: #fff; --text: #1e2d18; --accent: #3d8c2b; --border: #d4e5cc; }
-        body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 20px; margin: 0; }
-        .container { max-width: 500px; margin: 0 auto; }
-        .card { background: var(--surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border); box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
-        input { width: 100%; padding: 12px; border-radius: 8px; border: 1px solid var(--border); margin-bottom: 10px; font-size: 16px; }
-        button { width: 100%; padding: 12px; border-radius: 8px; border: none; background: var(--accent); color: white; font-weight: bold; cursor: pointer; }
-        .error { color: #d93025; background: #fce8e6; padding: 10px; border-radius: 8px; margin-top: 10px; font-size: 13px; display: none; border: 1px solid #f1998e; }
-        .item { display: flex; align-items: center; padding: 10px; border-bottom: 1px solid var(--border); gap: 10px; }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>FreshList 🛒</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+<style>
+  :root {
+    --bg:#f4f7f0; --surface:#fff; --text:#1e2d18; --accent:#3d8c2b;
+    --border:#d4e5cc; --muted:#6a8a60; --item-bg:#fff;
+  }
+  body.dark {
+    --bg:#131a10; --surface:#1c2619; --text:#e8f0e4; --accent:#5fba4a;
+    --border:#2e3d2a; --muted:#7a9e72; --item-bg:#253121;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { font-family: 'DM Sans', sans-serif; background: var(--bg); color: var(--text); padding: 20px; transition: 0.3s; }
+  .container { max-width: 500px; margin: 0 auto; }
+  h1 { font-family: 'Playfair Display'; margin-bottom: 20px; display: flex; justify-content: space-between; align-items: center; }
+  .card { background: var(--surface); padding: 20px; border-radius: 16px; border: 1px solid var(--border); margin-bottom: 20px; box-shadow: 0 4px 12px rgba(0,0,0,0.05); }
+  input { width: 100%; padding: 14px; border-radius: 10px; border: 1px solid var(--border); background: var(--bg); color: var(--text); font-size: 16px; margin-bottom: 10px; outline: none; }
+  button { width: 100%; padding: 14px; border-radius: 10px; border: none; background: var(--accent); color: white; font-weight: 700; cursor: pointer; }
+  button:disabled { opacity: 0.6; cursor: not-allowed; }
+  .item-row { display: flex; align-items: center; background: var(--item-bg); padding: 12px; border-radius: 10px; margin-bottom: 8px; border: 1px solid var(--border); gap: 12px; }
+  .item-row.checked { opacity: 0.5; text-decoration: line-through; }
+  .cat-label { font-size: 11px; font-weight: 800; color: var(--accent); margin: 15px 0 8px 5px; text-transform: uppercase; letter-spacing: 1px; }
+  .error-box { color: #d93025; background: #fce8e6; border: 1px solid #f1998e; padding: 10px; border-radius: 8px; margin-bottom: 15px; display: none; font-size: 14px; }
+</style>
 </head>
 <body>
-    <div class="container">
-        <h1 id="title">FreshList 🛒</h1>
-        <div class="card">
-            <input id="itemInput" placeholder="Milk, eggs, 2 apples..." onkeydown="if(event.key==='Enter')addItems()">
-            <button id="addBtn" onclick="addItems()">Add to List</button>
-            <div id="errorBox" class="error"></div>
-        </div>
-        <div id="listContainer"></div>
+
+<div class="container">
+  <h1>FreshList 🛒 <span onclick="document.body.classList.toggle('dark')" style="cursor:pointer; font-size:20px;">🌓</span></h1>
+
+  <div id="setup" class="card">
+    <p style="margin-bottom:15px; font-size:14px; color:var(--muted)">Enter a code to start or join a list.</p>
+    <input id="listInput" placeholder="Enter Code (e.g. SHOPPING)">
+    <button onclick="initApp()">Go to List</button>
+  </div>
+
+  <div id="main" style="display:none;">
+    <div id="errorBox" class="error-box"></div>
+    <div class="card">
+      <div style="font-weight:700; color:var(--accent); margin-bottom:10px;" id="codeDisplay"></div>
+      <input id="itemInput" placeholder="Add items (e.g. 2 milk, bread)..." onkeydown="if(event.key==='Enter')addItems()">
+      <button id="addBtn" onclick="addItems()">Add Items</button>
     </div>
+    <div id="listItems"></div>
+  </div>
+</div>
 
-    <script>
-        // 1. INITIALIZE FIREBASE
-        const firebaseConfig = {
-            databaseURL: "https://freshlist-e9665-default-rtdb.firebaseio.com", // Double check this!
-            projectId: "freshlist-e9665"
-        };
-        firebase.initializeApp(firebaseConfig);
-        const db = firebase.database();
+<script>
+  // --- 1. FIREBASE INITIALIZATION ---
+  const firebaseConfig = {
+    databaseURL: "https://fresh-bss-default-rtdb.firebaseio.com",
+    projectId: "fresh-bss"
+  };
+  firebase.initializeApp(firebaseConfig);
+  const db = firebase.database();
 
-        // 2. GET LIST ID FROM URL
-        const urlParams = new URLSearchParams(window.location.search);
-        let listId = urlParams.get('list') || 'DEMO';
-        document.getElementById('title').innerText = `List: ${listId} 🛒`;
+  // --- 2. CONFIG & STATE ---
+  let listId = null;
+  const CATS = ["Produce","Dairy","Bakery","Meat & Seafood","Frozen","Pantry","Beverages","Snacks","Household","Personal Care","Other"];
 
-        // 3. SYNC WITH DATABASE
-        db.ref(`lists/${listId}/items`).on('value', (snapshot) => {
-            const data = snapshot.val() || {};
-            const container = document.getElementById('listContainer');
-            container.innerHTML = "";
-            Object.entries(data).forEach(([id, item]) => {
-                container.innerHTML += `<div class="item">${item.emoji || '📦'} ${item.name}</div>`;
-            });
-        });
-
-        async function addItems() {
-  const input = document.getElementById('input');
-  const btn = document.getElementById('addBtn');
-  const err = document.getElementById('err');
-  
-  if (!input.value.trim() || btn.disabled) return;
-
-  btn.disabled = true;
-  btn.textContent = "Categorizing...";
-  err.style.display = 'none';
-
-  try {
-    const response = await fetch('/api/parse', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: input.value })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      throw new Error(errorData.error || "Server Error");
-    }
-
-    const data = await response.json();
-    
-    // This fixes the "forEach is not a function" error
-    const itemList = Array.isArray(data) ? data : (data.items || []);
-
-    if (itemList.length === 0) {
-      throw new Error("AI couldn't find any items in that text.");
-    }
-
-    for (const item of itemList) {
-      await db.ref(`lists/${listId}/items`).push({
-        ...item,
-        checked: false,
-        addedAt: Date.now()
-      });
-    }
-
-    input.value = "";
-  } catch (e) {
-    console.error(e);
-    err.textContent = "⚠️ " + e.message;
-    err.style.display = 'block';
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Add Items";
+  // --- 3. APP LOGIC ---
+  function initApp() {
+    const input = document.getElementById('listInput').value.trim().toUpperCase();
+    if (!input) return;
+    listId = input;
+    window.history.pushState({}, '', `?list=${listId}`);
+    renderApp();
   }
-}
-    </script>
+
+  function renderApp() {
+    document.getElementById('setup').style.display = 'none';
+    document.getElementById('main').style.display = 'block';
+    document.getElementById('codeDisplay').textContent = `List Code: ${listId}`;
+
+    // Listen for changes
+    db.ref(`lists/${listId}/items`).on('value', snap => {
+      const data = snap.val() || {};
+      const container = document.getElementById('listItems');
+      container.innerHTML = "";
+      
+      const itemsArr = Object.entries(data).map(([id, val]) => ({ id, ...val }));
+
+      CATS.forEach(cat => {
+        const catItems = itemsArr.filter(i => i.category === cat);
+        if (catItems.length === 0) return;
+        
+        container.innerHTML += `<div class="cat-label">${cat}</div>`;
+        catItems.forEach(item => {
+          container.innerHTML += `
+            <div class="item-row ${item.checked ? 'checked' : ''}" onclick="toggleItem('${item.id}', ${item.checked})">
+              <input type="checkbox" ${item.checked ? 'checked' : ''} style="width:18px; height:18px;">
+              <span style="flex-grow:1">${item.emoji || '📦'} ${item.name}</span>
+              <span style="opacity:0.3" onclick="event.stopPropagation(); deleteItem('${item.id}')">✕</span>
+            </div>`;
+        });
+      });
+    });
+  }
+
+  async function addItems() {
+    const input = document.getElementById('itemInput');
+    const btn = document.getElementById('addBtn');
+    const err = document.getElementById('errorBox');
+    
+    if (!input.value.trim() || btn.disabled) return;
+
+    btn.disabled = true;
+    btn.textContent = "AI Sorting...";
+    err.style.display = 'none';
+
+    try {
+      const response = await fetch('/api/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text: input.value })
+      });
+
+      if (!response.ok) throw new Error("AI Server Error (500). Check Cloudflare Settings.");
+
+      const data = await response.json();
+      
+      // Handle different AI response formats (Array vs Object with items array)
+      const itemList = Array.isArray(data) ? data : (data.items || []);
+
+      for (const item of itemList) {
+        db.ref(`lists/${listId}/items`).push({
+          ...item,
+          checked: false,
+          timestamp: Date.now()
+        });
+      }
+      input.value = "";
+    } catch (e) {
+      err.textContent = e.message;
+      err.style.display = 'block';
+    } finally {
+      btn.disabled = false;
+      btn.textContent = "Add Items";
+    }
+  }
+
+  function toggleItem(id, currentStatus) {
+    db.ref(`lists/${listId}/items/${id}`).update({ checked: !currentStatus });
+  }
+
+  function deleteItem(id) {
+    db.ref(`lists/${listId}/items/${id}`).remove();
+  }
+
+  // Handle direct links
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('list')) {
+    listId = params.get('list').toUpperCase();
+    renderApp();
+  }
+</script>
+
 </body>
 </html>
