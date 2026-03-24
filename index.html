@@ -416,17 +416,27 @@ async function addItems() {
       body: JSON.stringify({ text: val })
     });
 
-    if (!res.ok) throw new Error(`AI rejected request. Check Cloudflare Secrets.`);
+    if (!res.ok) {
+       throw new Error(`Server error (${res.status}). Check your Cloudflare logs.`);
+    }
 
     const data = await res.json();
+    
+    // FIX: This line now checks for BOTH a direct array or an "items" property
     const itemList = Array.isArray(data) ? data : (data.items || []);
 
-    if (itemList.length === 0) throw new Error("AI couldn't find items in that text.");
+    if (itemList.length === 0) {
+      throw new Error("AI couldn't find items in that text.");
+    }
 
-    for (const item of itemList) await pushItem(item);
+    for (const item of itemList) {
+      await pushItem(item);
+    }
+    
     input.value = '';
     input.focus();
   } catch (e) {
+    console.error("AI Error:", e);
     err.textContent = "⚠️ " + e.message;
     err.style.display = 'block';
   } finally {
