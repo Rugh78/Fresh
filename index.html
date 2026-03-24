@@ -466,8 +466,8 @@ function renderList() {
   const total = arr.length;
   const checked = arr.filter(i => i.checked).length;
 
+  // Update Progress
   document.getElementById('headerCount').textContent = total > 0 ? `· ${checked}/${total}` : '';
-
   const pw = document.getElementById('progressWrap');
   if (total > 0) {
     pw.style.display = 'block';
@@ -483,6 +483,7 @@ function renderList() {
   const done = arr.filter(i => i.checked);
   let html = '';
 
+  // 1. Render known categories
   CATS.forEach(cat => {
     const its = unchecked.filter(i => i.category === cat);
     if (!its.length) return;
@@ -492,6 +493,16 @@ function renderList() {
     </div>`;
   });
 
+  // 2. NEW: Render "Uncategorized" items (the ones currently missing!)
+  const uncategorized = unchecked.filter(i => !CATS.includes(i.category));
+  if (uncategorized.length) {
+    html += `<div class="cat-card">
+      <div class="cat-label">Other/Misc <span class="chip">${uncategorized.length}</span></div>
+      ${uncategorized.map(itemHTML).join('')}
+    </div>`;
+  }
+
+  // 3. Render completed
   if (done.length) {
     html += `<div class="cat-card completed-card">
       <div class="cat-label completed">✓ Completed <span class="chip">${done.length}</span></div>
