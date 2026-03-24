@@ -5,10 +5,9 @@ export async function onRequestPost(context) {
     
     const systemPrompt = `You are a professional grocery list parser.
     RULES:
-    1. TRANSLATE all items to English (e.g., "Tomate" becomes "Tomato").
-    2. CATEGORIZE items ONLY into: [Produce, Dairy, Bakery, Meat & Seafood, Frozen, Pantry, Beverages, Snacks, Household, Personal Care, Other].
-    3. If an item is a vegetable/fruit, it MUST be "Produce". If it is wine/soda, it MUST be "Beverages".
-    4. RESPOND ONLY with a JSON object: {"items": [{"name": "Tomato", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍅"}]}`;
+    1. TRANSLATE all items to English.
+    2. CATEGORIZE ONLY into: [Produce, Dairy, Bakery, Meat & Seafood, Frozen, Pantry, Beverages, Snacks, Household, Personal Care, Other].
+    3. Return ONLY a JSON object with this exact structure: {"items": [{"name": "string", "quantity": number, "unit": "string", "category": "string", "emoji": "string"}]}`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -20,7 +19,7 @@ export async function onRequestPost(context) {
         model: "llama-3.3-70b-versatile",
         messages: [
           { role: "system", content: systemPrompt },
-          { role: "user", content: `Translate and parse these items: "${text}"` }
+          { role: "user", content: `Parse: "${text}"` }
         ],
         temperature: 0,
         response_format: { type: "json_object" }
@@ -28,10 +27,12 @@ export async function onRequestPost(context) {
     });
 
     const data = await response.json();
+    // Return the content directly (it will be the JSON string from the AI)
     return new Response(data.choices[0].message.content, {
       headers: { "Content-Type": "application/json" }
     });
   } catch (err) {
+    // If API itself fails, return error so the frontend fallback triggers
     return new Response(JSON.stringify({ error: err.message }), { status: 500 });
   }
 }
