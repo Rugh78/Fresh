@@ -28,7 +28,7 @@
     --muted:#2e3d2a; --border:#2e3d2a;
     --shadow:rgba(0,0,0,0.4); --cat-bg:#1a2617; --cat-border:#2e3d2a;
   }
-  html, body { height: 100%; overflow-x: hidden; }
+  html, body { height: 100%; overflow-x: hidden; touch-action: pan-y; }
   body { font-family:'DM Sans',sans-serif; background:var(--bg); color:var(--text); transition:background .3s,color .3s; }
   button { cursor:pointer; font-family:'DM Sans',sans-serif; }
   button:active { opacity:.75; }
@@ -119,8 +119,7 @@
 
   /* Item */
   .item-wrap { margin-bottom:6px; position:relative; overflow:hidden; border-radius:12px; }
-  .item-bg-hint { position:absolute; inset:0; display:flex; align-items:center; justify-content:space-between; padding:0 18px; pointer-events:none; font-size:22px; }
-  .item-row { display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--item-bg); border-radius:12px; cursor:pointer; user-select:none; -webkit-user-select:none; position:relative; will-change:transform; }
+  .item-row { display:flex; align-items:center; gap:10px; padding:12px 14px; background:var(--item-bg); border-radius:12px; cursor:pointer; user-select:none; -webkit-user-select:none; position:relative; will-change:transform; transition: transform 0.1s ease-out; }
   .item-row.checked { background:var(--item-checked-bg); opacity:.6; }
   .item-checkbox { width:22px; height:22px; border-radius:50%; flex-shrink:0; border:2px solid var(--accent); background:transparent; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; transition:all .2s; }
   .item-checkbox.checked { background:var(--accent); }
@@ -169,15 +168,6 @@
   .share-sub { font-size:12px; margin-top:2px; }
   .share-btn.wa .share-sub { color:rgba(255,255,255,.8); }
   .share-btn.lnk .share-sub { color:var(--text-muted); }
-
-  /* Templates */
-  .tpl-item { background:var(--surface2); border-radius:12px; padding:13px 15px; margin-bottom:10px; display:flex; align-items:center; gap:10px; }
-  .tpl-name { font-weight:700; color:var(--text); font-size:15px; }
-  .tpl-meta { font-size:12px; color:var(--text-muted); margin-top:2px; }
-  .btn-load { background:var(--accent); color:white; border:none; border-radius:8px; padding:7px 14px; font-weight:600; font-size:13px; }
-  .btn-del-tpl { background:none; border:none; font-size:18px; opacity:.5; }
-  .tpl-scroll { max-height:55vh; overflow-y:auto; }
-  .tpl-empty { text-align:center; padding:28px; color:var(--text-muted); font-size:14px; }
 
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
@@ -325,8 +315,16 @@ let dark = localStorage.getItem('fl-dark') === 'true';
 // --- 3. LIFECYCLE ---
 window.addEventListener('load', () => {
   applyDark();
-  const code = new URLSearchParams(window.location.search).get('list');
-  if (code) enterList(code.toUpperCase());
+  const urlParams = new URLSearchParams(window.location.search);
+  const codeFromUrl = urlParams.get('list');
+  const lastUsed = localStorage.getItem('fl-last-list');
+
+  // Persistence Logic: URL first, then localStorage
+  if (codeFromUrl) {
+    enterList(codeFromUrl.toUpperCase());
+  } else if (lastUsed) {
+    enterList(lastUsed.toUpperCase());
+  }
 });
 document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeMenu(); });
 
@@ -353,6 +351,9 @@ function joinList() {
 
 function enterList(id) {
   listId = id;
+  // Save to persistence
+  localStorage.setItem('fl-last-list', id);
+  
   const url = new URL(window.location);
   url.searchParams.set('list', id);
   window.history.replaceState({}, '', url);
@@ -366,6 +367,7 @@ function enterList(id) {
 function switchList() {
   if (dbUnsub) { dbUnsub(); dbUnsub = null; }
   listId = null; items = {};
+  localStorage.removeItem('fl-last-list');
   window.history.replaceState({}, '', window.location.pathname);
   document.getElementById('joinInput').value = '';
   document.getElementById('joinBox').style.display = 'none';
@@ -383,27 +385,13 @@ function subscribeToList() {
 }
 
 // --- 4. ACTIONS ---
-async function pushItem(item) {
-  await db.ref(`lists/${listId}/items`).push({
-    name: item.name, quantity: item.quantity || 1,
-    unit: item.unit || '', category: item.category,
-    emoji: item.emoji, checked: false
-  });
-}
-
-function toggleItem(id) {
-  db.ref(`lists/${listId}/items/${id}`).update({ checked: !items[id]?.checked });
-}
-function deleteItem(id) { db.ref(`lists/${listId}/items/${id}`).remove(); }
-function updateQty(id, qty) { db.ref(`lists/${listId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
-function clearList() { if (confirm('Clear the entire list?')) db.ref(`lists/${listId}/items`).remove(); }
-
 async function addItems() {
   const input = document.getElementById('itemInput');
   const btn = document.getElementById('addBtn');
   const err = document.getElementById('errorMsg');
+  const rawValue = input.value.trim();
   
-  if (!input.value.trim() || btn.disabled) return;
+  if (!rawValue || btn.disabled) return;
 
   btn.disabled = true;
   btn.textContent = '⏳ Categorizing...';
@@ -413,29 +401,22 @@ async function addItems() {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: input.value })
+      body: JSON.stringify({ text: rawValue })
     });
 
-    if (!response.ok) throw new Error("Connection lost. Refresh and try again.");
+    if (!response.ok) throw new Error("API Offline");
 
     const rawData = await response.json();
-    
-    // This part is the "Universal Finder"
-    // It checks if items are inside 'data', 'data.items', or 'data.choices'
     let itemList = [];
-    if (Array.isArray(rawData)) {
-      itemList = rawData;
-    } else if (rawData.items && Array.isArray(rawData.items)) {
-      itemList = rawData.items;
-    } else if (rawData.choices) {
-      // In case the raw Groq response is passed through
-      const parsed = JSON.parse(rawData.choices[0].message.content);
-      itemList = Array.isArray(parsed) ? parsed : (parsed.items || []);
+    if (Array.isArray(rawData)) itemList = rawData;
+    else if (rawData.items) itemList = rawData.items;
+    else if (rawData.choices) {
+        const parsed = JSON.parse(rawData.choices[0].message.content);
+        itemList = parsed.items || [];
     }
 
-    if (itemList.length === 0) throw new Error("AI found 0 items. Try being more specific.");
+    if (!itemList || itemList.length === 0) throw new Error("No items parsed");
 
-    // Loop through and add every single item found
     for (const item of itemList) {
       await db.ref(`lists/${listId}/items`).push({
         name: item.name || "Unknown Item",
@@ -447,13 +428,27 @@ async function addItems() {
         addedAt: Date.now()
       });
     }
-
     input.value = "";
     input.focus();
   } catch (e) {
-    console.error("Parse Error:", e);
-    err.textContent = "⚠️ " + e.message;
+    console.error("AI Parse Error, using Fallback:", e);
+    // FALLBACK: Manual split and add
+    const splitItems = rawValue.split(',').map(s => s.trim()).filter(s => s.length > 0);
+    for (const name of splitItems) {
+        await db.ref(`lists/${listId}/items`).push({
+            name: name,
+            quantity: 1,
+            unit: "",
+            category: "Other",
+            emoji: "📦",
+            checked: false,
+            addedAt: Date.now()
+        });
+    }
+    input.value = "";
+    err.textContent = "Added items manually (AI categorized failed)";
     err.style.display = 'block';
+    setTimeout(() => { err.style.display = 'none'; }, 3000);
   } finally {
     btn.disabled = false;
     btn.textContent = '+ Add Items';
@@ -466,7 +461,6 @@ function renderList() {
   const total = arr.length;
   const checked = arr.filter(i => i.checked).length;
 
-  // Update Progress
   document.getElementById('headerCount').textContent = total > 0 ? `· ${checked}/${total}` : '';
   const pw = document.getElementById('progressWrap');
   if (total > 0) {
@@ -483,7 +477,6 @@ function renderList() {
   const done = arr.filter(i => i.checked);
   let html = '';
 
-  // 1. Render known categories
   CATS.forEach(cat => {
     const its = unchecked.filter(i => i.category === cat);
     if (!its.length) return;
@@ -493,7 +486,6 @@ function renderList() {
     </div>`;
   });
 
-  // 2. NEW: Render "Uncategorized" items (the ones currently missing!)
   const uncategorized = unchecked.filter(i => !CATS.includes(i.category));
   if (uncategorized.length) {
     html += `<div class="cat-card">
@@ -502,7 +494,6 @@ function renderList() {
     </div>`;
   }
 
-  // 3. Render completed
   if (done.length) {
     html += `<div class="cat-card completed-card">
       <div class="cat-label completed">✓ Completed <span class="chip">${done.length}</span></div>
@@ -517,10 +508,6 @@ function renderList() {
 function itemHTML(item) {
   const qtyLabel = item.quantity > 1 ? `<span class="item-qty">${item.quantity}${item.unit?' '+item.unit:''}×</span>` : '';
   return `<div class="item-wrap" id="wrap-${item.id}">
-    <div class="item-bg-hint">
-      <span id="he-${item.id}" style="opacity:0;transition:opacity .1s">✏️</span>
-      <span id="hd-${item.id}" style="opacity:0;transition:opacity .1s">🗑️</span>
-    </div>
     <div class="item-row${item.checked?' checked':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
       <div class="item-checkbox${item.checked?' checked':''}">${item.checked?'✓':''}</div>
       <span class="item-emoji">${item.emoji}</span>
@@ -543,7 +530,11 @@ function itemHTML(item) {
   </div>`;
 }
 
-// Swipe logic, UI helpers, and templates stay the same...
+function toggleItem(id) { db.ref(`lists/${listId}/items/${id}`).update({ checked: !items[id]?.checked }); }
+function deleteItem(id) { db.ref(`lists/${listId}/items/${id}`).remove(); }
+function updateQty(id, qty) { db.ref(`lists/${listId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
+function clearList() { if (confirm('Clear the entire list?')) db.ref(`lists/${listId}/items`).remove(); }
+
 function adj(id, d) {
   const inp = document.getElementById(`qi-${id}`);
   if (inp) inp.value = Math.max(1, parseInt(inp.value||1)+d);
@@ -570,20 +561,40 @@ function attachSwipe() {
   Object.keys(items).forEach(id => {
     const row = document.getElementById(`row-${id}`);
     if (!row) return;
-    let sx = null, cx = 0;
+    let sx = null, sy = null, cx = 0, cy = 0;
     const THRESH = 60;
-    row.addEventListener('touchstart', e => { sx = e.touches[0].clientX; }, {passive:true});
+
+    row.addEventListener('touchstart', e => { 
+        sx = e.touches[0].clientX; 
+        sy = e.touches[0].clientY;
+        row.style.transition = 'none'; 
+    }, {passive:true});
+
     row.addEventListener('touchmove', e => {
-      if (sx === null) return;
+      if (sx === null || sy === null) return;
       cx = e.touches[0].clientX - sx;
+      cy = e.touches[0].clientY - sy;
+
+      // Swipe UX Fix: If moving horizontally more than vertically, prevent scroll
+      if (Math.abs(cx) > Math.abs(cy)) {
+          if (e.cancelable) e.preventDefault();
+      } else {
+          // If they are clearly scrolling vertically, stop the horizontal logic
+          return;
+      }
+
       const cl = Math.max(-80, Math.min(80, cx));
       row.style.transform = `translateX(${cl}px)`;
-    }, {passive:true});
+    }, {passive:false}); // passive:false is required to allow preventDefault
+
     row.addEventListener('touchend', () => {
+      row.style.transition = 'transform 0.2s ease-out';
       row.style.transform = 'translateX(0)';
-      if (cx > THRESH) openQty(id);
-      else if (cx < -THRESH) deleteItem(id);
-      sx = null; cx = 0;
+      if (Math.abs(cx) > Math.abs(cy)) { // Only trigger if horizontal movement was dominant
+          if (cx > THRESH) openQty(id);
+          else if (cx < -THRESH) deleteItem(id);
+      }
+      sx = null; sy = null; cx = 0; cy = 0;
     });
   });
 }
@@ -599,15 +610,12 @@ function closeMenu() { document.getElementById('menuDropdown').classList.remove(
 
 function updateTplCount() {
   const el = document.getElementById('tplCount');
+  if (!el) return;
   el.style.display = templates.length ? 'inline' : 'none';
   el.textContent = templates.length;
 }
-function openSaveTemplate() {
-  document.getElementById('saveTplModal').classList.add('open');
-}
-function closeSaveTemplate() {
-  document.getElementById('saveTplModal').classList.remove('open');
-}
+function openSaveTemplate() { document.getElementById('saveTplModal').classList.add('open'); }
+function closeSaveTemplate() { document.getElementById('saveTplModal').classList.remove('open'); }
 function saveTemplate() {
   const name = document.getElementById('tplNameInput').value.trim();
   if (!name) return;
@@ -630,7 +638,9 @@ function openTemplates() {
 function closeTemplates() { document.getElementById('tplListModal').classList.remove('open'); }
 async function loadTemplate(i) {
   await db.ref(`lists/${listId}/items`).remove();
-  for (const item of templates[i].items) await pushItem(item);
+  for (const item of templates[i].items) {
+      await db.ref(`lists/${listId}/items`).push({...item});
+  }
   closeTemplates();
 }
 function delTemplate(i) {
