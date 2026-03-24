@@ -53,45 +53,56 @@
             });
         });
 
-        // 4. ADD ITEMS (AI PARSING)
         async function addItems() {
-            const input = document.getElementById('itemInput');
-            const btn = document.getElementById('addBtn');
-            const errBox = document.getElementById('errorBox');
-            
-            if (!input.value.trim()) return;
-            
-            btn.disabled = true;
-            btn.innerText = "Categorizing...";
-            errBox.style.display = 'none';
+  const input = document.getElementById('input');
+  const btn = document.getElementById('addBtn');
+  const err = document.getElementById('err');
+  
+  if (!input.value.trim() || btn.disabled) return;
 
-            try {
-                const response = await fetch('/api/parse', {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ text: input.value })
-                });
+  btn.disabled = true;
+  btn.textContent = "Categorizing...";
+  err.style.display = 'none';
 
-                const result = await response.json();
+  try {
+    const response = await fetch('/api/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: input.value })
+    });
 
-                if (!response.ok) {
-                    // This will now show the REAL error from the server
-                    throw new Error(result.error || "Unknown Server Error");
-                }
+    if (!response.ok) {
+      const errorData = await response.json();
+      throw new Error(errorData.error || "Server Error");
+    }
 
-                result.forEach(item => {
-                    db.ref(`lists/${listId}/items`).push(item);
-                });
-                
-                input.value = "";
-            } catch (err) {
-                errBox.innerText = "⚠️ " + err.message;
-                errBox.style.display = 'block';
-            } finally {
-                btn.disabled = false;
-                btn.innerText = "Add to List";
-            }
-        }
+    const data = await response.json();
+    
+    // This fixes the "forEach is not a function" error
+    const itemList = Array.isArray(data) ? data : (data.items || []);
+
+    if (itemList.length === 0) {
+      throw new Error("AI couldn't find any items in that text.");
+    }
+
+    for (const item of itemList) {
+      await db.ref(`lists/${listId}/items`).push({
+        ...item,
+        checked: false,
+        addedAt: Date.now()
+      });
+    }
+
+    input.value = "";
+  } catch (e) {
+    console.error(e);
+    err.textContent = "⚠️ " + e.message;
+    err.style.display = 'block';
+  } finally {
+    btn.disabled = false;
+    btn.textContent = "Add Items";
+  }
+}
     </script>
 </body>
 </html>
