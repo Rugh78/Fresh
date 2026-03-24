@@ -400,47 +400,62 @@ function clearList() { if (confirm('Clear the entire list?')) db.ref(`lists/${li
 
 async function addItems() {
   const input = document.getElementById('itemInput');
-  const val = input.value.trim();
-  if (!val || !listId) return;
   const btn = document.getElementById('addBtn');
   const err = document.getElementById('errorMsg');
   
-  btn.disabled = true; 
+  if (!input.value.trim() || btn.disabled) return;
+
+  btn.disabled = true;
   btn.textContent = '⏳ Categorizing...';
   err.style.display = 'none';
-  
+
   try {
-    const res = await fetch('/api/parse', {
+    const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: val })
+      body: JSON.stringify({ text: input.value })
     });
 
-    if (!res.ok) {
-       throw new Error(`Server error (${res.status}). Check your Cloudflare logs.`);
-    }
+    if (!response.ok) throw new Error("Connection lost. Refresh and try again.");
 
-    const data = await res.json();
+    const rawData = await response.json();
     
-    // FIX: This line now checks for BOTH a direct array or an "items" property
-    const itemList = Array.isArray(data) ? data : (data.items || []);
-
-    if (itemList.length === 0) {
-      throw new Error("AI couldn't find items in that text.");
+    // This part is the "Universal Finder"
+    // It checks if items are inside 'data', 'data.items', or 'data.choices'
+    let itemList = [];
+    if (Array.isArray(rawData)) {
+      itemList = rawData;
+    } else if (rawData.items && Array.isArray(rawData.items)) {
+      itemList = rawData.items;
+    } else if (rawData.choices) {
+      // In case the raw Groq response is passed through
+      const parsed = JSON.parse(rawData.choices[0].message.content);
+      itemList = Array.isArray(parsed) ? parsed : (parsed.items || []);
     }
 
+    if (itemList.length === 0) throw new Error("AI found 0 items. Try being more specific.");
+
+    // Loop through and add every single item found
     for (const item of itemList) {
-      await pushItem(item);
+      await db.ref(`lists/${listId}/items`).push({
+        name: item.name || "Unknown Item",
+        quantity: item.quantity || 1,
+        unit: item.unit || "",
+        category: item.category || "Other",
+        emoji: item.emoji || "📦",
+        checked: false,
+        addedAt: Date.now()
+      });
     }
-    
-    input.value = '';
+
+    input.value = "";
     input.focus();
   } catch (e) {
-    console.error("AI Error:", e);
+    console.error("Parse Error:", e);
     err.textContent = "⚠️ " + e.message;
     err.style.display = 'block';
   } finally {
-    btn.disabled = false; 
+    btn.disabled = false;
     btn.textContent = '+ Add Items';
   }
 }
