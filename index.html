@@ -168,6 +168,31 @@
   .share-sub { font-size:12px; margin-top:2px; }
   .share-btn.wa .share-sub { color:rgba(255,255,255,.8); }
   .share-btn.lnk .share-sub { color:var(--text-muted); }
+
+ /* Refresh Spin Animation */
+  .btn-refresh-cat {
+    background: var(--muted);
+    border: none;
+    border-radius: 6px;
+    padding: 2px 8px;
+    font-size: 12px;
+    cursor: pointer;
+    color: var(--accent);
+    font-weight: 700;
+    margin-left: 10px;
+    transition: all 0.2s;
+  }
+  .btn-refresh-cat:active { transform: scale(0.9); }
+  
+  @keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+  }
+  .spinning {
+    display: inline-block;
+    animation: spin 1s linear infinite;
+  }
+ 
 /* ── TEMPLATES (Missing Styling) ── */
   .tpl-item { 
     background: var(--surface2); 
@@ -541,10 +566,16 @@ function renderList() {
     </div>`;
   });
 
-  const uncategorized = unchecked.filter(i => !CATS.includes(i.category));
+  // 2. Render "Uncategorized" items with a Refresh Button
+  const uncategorized = unchecked.filter(i => !CATS.includes(i.category) || i.category === 'Other');
   if (uncategorized.length) {
     html += `<div class="cat-card">
-      <div class="cat-label">Other/Misc <span class="chip">${uncategorized.length}</span></div>
+      <div class="cat-label">
+        Other/Misc <span class="chip">${uncategorized.length}</span>
+        <button class="btn-refresh-cat" id="reCatBtn" onclick="recategorizeOther()">
+          <span id="reCatIcon">✨</span> Fix with AI
+        </button>
+      </div>
       ${uncategorized.map(itemHTML).join('')}
     </div>`;
   }
@@ -654,6 +685,63 @@ function attachSwipe() {
   });
 }
 
+ async function recategorizeOther() {
+  const btn = document.getElementById('reCatBtn');
+  const icon = document.getElementById('reCatIcon');
+  
+  // 1. Find all items currently in "Other" that aren't checked
+  const otherItems = Object.entries(items)
+    .filter(([id, val]) => (!CATS.includes(val.category) || val.category === 'Other') && !val.checked)
+    .map(([id, val]) => ({ id, name: val.name }));
+
+  if (otherItems.length === 0) return;
+
+  // 2. UI Loading State
+  btn.disabled = true;
+  icon.classList.add('spinning');
+  icon.textContent = '⏳';
+
+  try {
+    // 3. Send names to AI
+    const namesString = otherItems.map(i => i.name).join(', ');
+    const response = await fetch('/api/parse', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ text: namesString })
+    });
+
+    if (!response.ok) throw new Error("Retry failed");
+
+    const data = await response.json();
+    let newItems = data.items || [];
+    if (data.choices) newItems = JSON.parse(data.choices[0].message.content).items;
+
+    // 4. Update Firebase for each item found
+    for (const newItem of newItems) {
+      // Find the original item ID by matching the name
+      const original = otherItems.find(o => 
+        newItem.name.toLowerCase().includes(o.name.toLowerCase()) || 
+        o.name.toLowerCase().includes(newItem.name.toLowerCase())
+      );
+
+      if (original) {
+        await db.ref(`lists/${listId}/items/${original.id}`).update({
+          category: newItem.category,
+          emoji: newItem.emoji,
+          name: newItem.name // AI might have fixed the spelling
+        });
+      }
+    }
+  } catch (e) {
+    console.error("Recategorize error:", e);
+    alert("AI is still having trouble. Try again in a moment!");
+  } finally {
+    btn.disabled = false;
+    icon.classList.remove('spinning');
+    icon.textContent = '✨';
+  }
+}
+ 
 function applyDark() {
   document.body.classList.toggle('dark', dark);
   const icon = dark ? '☀️' : '🌙';
