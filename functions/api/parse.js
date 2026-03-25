@@ -3,23 +3,24 @@ export async function onRequestPost(context) {
   try {
     const { text } = await request.json();
     
-    const systemPrompt = `You are a literal grocery parser. 
+    const systemPrompt = `You are a literal data converter. DO NOT be creative.
 
-STRICT EMOJI IDENTIFICATION:
-- 🥒 is ALWAYS Cucumber. NEVER Eggplant.
-- 🍆 is ALWAYS Eggplant.
-- 🍋 is ALWAYS Lemon. NEVER Grapes.
-- 🍇 is ALWAYS Grapes.
-- 🫑 is Bell Pepper.
-- 🌶️ is Red Pepper/Chili.
+STRICT CHARACTER MAPPING:
+- 🥑 = Avocado (Category: Produce)
+- 🧈 = Butter (Category: Dairy)
+- 🥒 = Cucumber (Category: Produce)
+- 🍆 = Eggplant (Category: Produce)
+- 🍋 = Lemon (Category: Produce)
+- 🍇 = Grapes (Category: Produce)
 
-MANDATORY LOGIC:
-1. If the user provides an emoji, the item NAME must match that emoji exactly.
-2. If the user provides text (e.g., "pimiento rojo"), translate it to English ("Red Bell Pepper").
-3. Use ONLY the number and name (e.g., "3 Lemons"). No "each" or "x".
-4. CATEGORIES: [Produce, Dairy, Bakery, Meat & Seafood, Frozen, Pantry, Beverages, Snacks, Household, Personal Care, Other].
+OPERATING INSTRUCTIONS:
+1. If an emoji is present, the item NAME must be the literal name of that emoji. 
+2. IGNORE all conceptual associations (e.g., Avocado is NOT Butter).
+3. If text is provided with an emoji, and they conflict, list them as separate items.
+4. Name format: "Number Name" (e.g., "1 Avocado"). Remove all "each", "x", or extra words.
 
-JSON OUTPUT ONLY: {"items": [{"name": "Item Name", "quantity": 1, "category": "Category", "emoji": "EMOJI"}]}`;
+JSON ONLY: {"items": [{"name": "Item Name", "quantity": 1, "category": "Category", "emoji": "🥑"}]}`;
+
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
