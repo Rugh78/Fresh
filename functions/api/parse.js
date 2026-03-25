@@ -3,24 +3,16 @@ export async function onRequestPost(context) {
   try {
     const { text } = await request.json();
     
-    const systemPrompt = `You are a literal data converter. DO NOT be creative.
+    const systemPrompt = `You are a simple JSON converter.
+User provides: "Quantity ItemName" or "Emoji ItemName".
 
-STRICT CHARACTER MAPPING:
-- 🥑 = Avocado (Category: Produce)
-- 🧈 = Butter (Category: Dairy)
-- 🥒 = Cucumber (Category: Produce)
-- 🍆 = Eggplant (Category: Produce)
-- 🍋 = Lemon (Category: Produce)
-- 🍇 = Grapes (Category: Produce)
+RULES:
+1. Translate to English.
+2. Use the most logical emoji for the item.
+3. Output ONLY this JSON format:
+{"items": [{"name": "Item Name", "quantity": 1, "category": "Produce", "emoji": "🍎"}]}
 
-OPERATING INSTRUCTIONS:
-1. If an emoji is present, the item NAME must be the literal name of that emoji. 
-2. IGNORE all conceptual associations (e.g., Avocado is NOT Butter).
-3. If text is provided with an emoji, and they conflict, list them as separate items.
-4. Name format: "Number Name" (e.g., "1 Avocado"). Remove all "each", "x", or extra words.
-
-JSON ONLY: {"items": [{"name": "Item Name", "quantity": 1, "category": "Category", "emoji": "🥑"}]}`;
-
+CATEGORIES: [Produce, Dairy, Bakery, Meat, Frozen, Pantry, Beverages, Snacks, Household, Other]`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
