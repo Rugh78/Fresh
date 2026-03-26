@@ -14,7 +14,7 @@ export async function onRequest(context) {
   try {
     const body = await request.json();
 
-    // FIX 1: Accept both "text" (sent by frontend) and "userInput" (legacy)
+    // Accept both "text" (sent by frontend) and "userInput" (legacy)
     const userInput = body.text || body.userInput;
 
     if (!userInput || userInput.trim() === "") {
@@ -35,10 +35,29 @@ export async function onRequest(context) {
         messages: [
           {
             role: "system",
-            content: `You are a grocery list parser. The user gives you a list of grocery items (comma-separated or natural language).
+            content: `You are a grocery list parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
+The user gives you grocery items in any language or mix of languages.
+
+Rules:
+- PRESERVE the item name EXACTLY as the user wrote it — same language, same spelling, do NOT translate.
+- Choose the correct category based on what the item IS, regardless of language.
+- Pick an appropriate emoji for the item.
+- Infer quantity from context (e.g. "2 חלב" → quantity 2, name "חלב").
+
 Return ONLY a valid JSON object with an 'items' array. No extra text, no markdown, no explanation.
-Each item must have: name (string), quantity (number), unit (string, can be empty), category (one of: Produce, Dairy, Bakery, Meat & Seafood, Frozen, Pantry, Beverages, Snacks, Household, Personal Care, Other), emoji (single relevant emoji).
-Example: {"items": [{"name": "Milk", "quantity": 2, "unit": "L", "category": "Dairy", "emoji": "🥛"}]}`
+Each item must have:
+  name (string — original language, as written by user),
+  quantity (number, default 1),
+  unit (string, can be empty),
+  category (one of: Produce, Dairy, Bakery, Meat & Seafood, Frozen, Pantry, Beverages, Snacks, Household, Personal Care, Other),
+  emoji (single relevant emoji)
+
+Examples:
+Input: "חלב, ביצים, לחם"
+Output: {"items": [{"name": "חלב", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "ביצים", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "לחם", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}
+
+Input: "2 milk, eggs, bread"
+Output: {"items": [{"name": "Milk", "quantity": 2, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "Eggs", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "Bread", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}`
           },
           { role: "user", content: userInput }
         ],
