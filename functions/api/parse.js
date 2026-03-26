@@ -1,24 +1,12 @@
 export async function onRequest(context) {
   const { request, env } = context;
-  if (request.method !== "POST") return new Response("Method not allowed", { status: 405 });
+  
+  if (request.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
+  }
 
   try {
     const { userInput } = await request.json();
-
-    const systemPrompt = `You are a grocery data extractor.
-EXAMPLES of correct mapping:
-- "🍋" -> {"name": "Lemon", "emoji": "🍋", "category": "Produce"}
-- "🥑" -> {"name": "Avocado", "emoji": "🥑", "category": "Produce"}
-- "🌽" -> {"name": "Corn", "emoji": "🌽", "category": "Produce"}
-- "🍅" -> {"name": "Tomato", "emoji": "🍅", "category": "Produce"}
-- "butter" -> {"name": "Butter", "emoji": "🧈", "category": "Dairy"}
-
-STRICT RULES:
-1. NEVER use the Avocado emoji 🥑 for "Butter".
-2. NEVER use the Lemon emoji 🍋 for "Tomato".
-3. If an emoji is provided, the name MUST match that emoji.
-
-JSON ONLY: {"items": []}`;
 
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
@@ -29,20 +17,38 @@ JSON ONLY: {"items": []}`;
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { "role": "system", "content": systemPrompt },
+          { 
+            "role": "system", 
+            "content": "You are a grocery parser. Convert input to a JSON object with an 'items' array. Each item needs: name, quantity, category, and emoji. Output JSON only." 
+          },
           { "role": "user", "content": userInput }
         ],
         temperature: 0,
-        response_format: { "type": "json_object" }
+        response_format: { type: "json_object" }
       })
     });
 
     const data = await response.json();
+
+    // INTERCEPT HTTP ERRORS (e.g., 401 Invalid API Key, 400 Bad Request)
+    if (!response.ok) {
+      const groqErrorMessage = data.error?.message || response.statusText;
+      throw new Error(`Groq API rejected the request: ${groqErrorMessage}`);
+    }
+
+    if (!data.choices || !data.choices[0]) {
+      throw new Error("Groq API succeeded but returned an invalid structure.");
+    }
+
     return new Response(data.choices[0].message.content, {
       headers: { "Content-Type": "application/json" }
     });
 
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), { status: 500 });
+    // Expose the exact error back to the client
+    return new Response(JSON.stringify({ error: error.message }), { 
+      status: 500,
+      headers: { "Content-Type": "application/json" }
+    });
   }
 }
