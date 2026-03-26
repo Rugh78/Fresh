@@ -39,7 +39,7 @@ export async function onRequest(context) {
 The user gives you grocery items in any language or mix of languages.
 
 Rules:
-- If an item contains non-emoji text, PRESERVE the item name EXACTLY as the user wrote it — same language, same spelling, do NOT translate.
+- ALWAYS output the item name in English, regardless of the input language. Translate Hebrew/Arabic/etc. to English.
 - If an item is written ONLY as emoji(s), convert it to a clear TEXT name in English (e.g., 🍋 → "Lemon"). Keep the emoji field as the emoji. If the same emoji is repeated (e.g., 🌽🌽), set quantity equal to the count of repeated emojis and keep a single text name (e.g., "Corn").
 - Choose the correct category based on what the item IS, regardless of language.
 - Pick an appropriate emoji for the item.
@@ -47,7 +47,7 @@ Rules:
 
 Return ONLY a valid JSON object with an 'items' array. No extra text, no markdown, no explanation.
 Each item must have:
-  name (string — original language, as written by user),
+  name (string — in English),
   quantity (number, default 1),
   unit (string, can be empty),
   category (one of: Produce, Dairy, Bakery, Meat & Seafood, Frozen, Pantry, Beverages, Snacks, Household, Personal Care, Other),
@@ -55,7 +55,7 @@ Each item must have:
 
 Examples:
 Input: "חלב, ביצים, לחם"
-Output: {"items": [{"name": "חלב", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "ביצים", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "לחם", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}
+Output: {"items": [{"name": "Milk", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "Eggs", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "Bread", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}
 
 Input: "2 milk, eggs, bread"
 Output: {"items": [{"name": "Milk", "quantity": 2, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "Eggs", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "Bread", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}
