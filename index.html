@@ -494,15 +494,10 @@ async function addItems() {
     if (!response.ok) throw new Error("API Offline");
 
     const rawData = await response.json();
-    let itemList = [];
-    if (Array.isArray(rawData)) itemList = rawData;
-    else if (rawData.items) itemList = rawData.items;
-    else if (rawData.choices) {
-        const parsed = JSON.parse(rawData.choices[0].message.content);
-        itemList = parsed.items || [];
-    }
+    // Worker always returns { items: [...] } — no need to handle raw Groq shape anymore
+    const itemList = rawData.items || [];
 
-    if (!itemList || itemList.length === 0) throw new Error("No items parsed");
+    if (itemList.length === 0) throw new Error("No items parsed");
 
     for (const item of itemList) {
       await db.ref(`lists/${listId}/items`).push({
@@ -598,13 +593,21 @@ function renderList() {
   attachSwipe();
 }
 
+function escapeHTML(str) {
+  return String(str)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
 function itemHTML(item) {
   const qtyLabel = item.quantity > 1 ? `<span class="item-qty">${item.quantity}${item.unit?' '+item.unit:''}×</span>` : '';
   return `<div class="item-wrap" id="wrap-${item.id}">
     <div class="item-row${item.checked?' checked':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
       <div class="item-checkbox${item.checked?' checked':''}">${item.checked?'✓':''}</div>
-      <span class="item-emoji">${item.emoji}</span>
-      <span class="item-name${item.checked?' checked':''}">${qtyLabel}${item.name}</span>
+      <span class="item-emoji">${escapeHTML(item.emoji)}</span>
+      <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(item.name)}</span>
     </div>
     <div class="swipe-hint">← del · edit →</div>
     <div class="qty-panel" id="qp-${item.id}">
@@ -709,7 +712,7 @@ function attachSwipe() {
   icon.textContent = '⏳';
 
   try {
-    // 3. Send names to AI
+    // 3. Send items as "name" strings; build a name->id map for reliable matching
     const namesString = otherItems.map(i => i.name).join(', ');
     const response = await fetch('/api/parse', {
       method: 'POST',
@@ -720,22 +723,28 @@ function attachSwipe() {
     if (!response.ok) throw new Error("Retry failed");
 
     const data = await response.json();
-    let newItems = data.items || [];
-    if (data.choices) newItems = JSON.parse(data.choices[0].message.content).items;
+    const newItems = data.items || [];
 
-    // 4. Update Firebase for each item found
+    // FIX 3: Build a name->id lookup instead of fragile inline find()
+    const nameToId = {};
+    otherItems.forEach(o => { nameToId[o.name.toLowerCase()] = o.id; });
+
     for (const newItem of newItems) {
-      // Find the original item ID by matching the name
-      const original = otherItems.find(o => 
-        newItem.name.toLowerCase().includes(o.name.toLowerCase()) || 
-        o.name.toLowerCase().includes(newItem.name.toLowerCase())
-      );
+      const key = newItem.name.toLowerCase();
+      // Exact match first, then substring fallback
+      let matchedId = nameToId[key];
+      if (!matchedId) {
+        const found = otherItems.find(o =>
+          key.includes(o.name.toLowerCase()) || o.name.toLowerCase().includes(key)
+        );
+        matchedId = found?.id;
+      }
 
-      if (original) {
-        await db.ref(`lists/${listId}/items/${original.id}`).update({
+      if (matchedId) {
+        await db.ref(`lists/${listId}/items/${matchedId}`).update({
           category: newItem.category,
           emoji: newItem.emoji,
-          name: newItem.name // AI might have fixed the spelling
+          name: newItem.name
         });
       }
     }
