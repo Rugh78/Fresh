@@ -39,7 +39,8 @@ export async function onRequest(context) {
 The user gives you grocery items in any language or mix of languages.
 
 Rules:
-- PRESERVE the item name EXACTLY as the user wrote it — same language, same spelling, do NOT translate.
+- If an item contains non-emoji text, PRESERVE the item name EXACTLY as the user wrote it — same language, same spelling, do NOT translate.
+- If an item is written ONLY as emoji(s), convert it to a clear TEXT name in English (e.g., 🍋 → "Lemon"). Keep the emoji field as the emoji. If the same emoji is repeated (e.g., 🌽🌽), set quantity equal to the count of repeated emojis and keep a single text name (e.g., "Corn").
 - Choose the correct category based on what the item IS, regardless of language.
 - Pick an appropriate emoji for the item.
 - Infer quantity from context (e.g. "2 חלב" → quantity 2, name "חלב").
@@ -57,7 +58,17 @@ Input: "חלב, ביצים, לחם"
 Output: {"items": [{"name": "חלב", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "ביצים", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "לחם", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}
 
 Input: "2 milk, eggs, bread"
-Output: {"items": [{"name": "Milk", "quantity": 2, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "Eggs", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "Bread", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}`
+Output: {"items": [{"name": "Milk", "quantity": 2, "unit": "", "category": "Dairy", "emoji": "🥛"}, {"name": "Eggs", "quantity": 1, "unit": "", "category": "Dairy", "emoji": "🥚"}, {"name": "Bread", "quantity": 1, "unit": "", "category": "Bakery", "emoji": "🍞"}]}
+
+Input: "🍋, 🍅, 🌽🌽, 🍉, 🍏, 🥑"
+Output: {"items": [
+  {"name": "Lemon", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍋"},
+  {"name": "Tomato", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍅"},
+  {"name": "Corn", "quantity": 2, "unit": "", "category": "Produce", "emoji": "🌽"},
+  {"name": "Watermelon", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍉"},
+  {"name": "Green Apple", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍏"},
+  {"name": "Avocado", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🥑"}
+]}`
           },
           { role: "user", content: userInput }
         ],
