@@ -1,8 +1,14 @@
 export async function onRequest(context) {
   const { request, env } = context;
-  
-  if (request.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
   }
 
   try {
@@ -17,11 +23,8 @@ export async function onRequest(context) {
       body: JSON.stringify({
         model: "llama-3.1-8b-instant",
         messages: [
-          { 
-            "role": "system", 
-            "content": "You are a grocery parser. Convert input to a JSON object with an 'items' array. Each item needs: name, quantity, category, and emoji. Output JSON only." 
-          },
-          { "role": "user", "content": userInput }
+          { role: "system", content: "Return ONLY a JSON object with an 'items' array. Example: {\"items\": [{\"name\": \"Milk\", \"quantity\": 1, \"category\": \"Dairy\", \"emoji\": \"🥛\"}]}" },
+          { role: "user", content: userInput }
         ],
         temperature: 0,
         response_format: { type: "json_object" }
@@ -29,26 +32,24 @@ export async function onRequest(context) {
     });
 
     const data = await response.json();
+    
+    // --- THE CRITICAL FIX ---
+    // We parse the string from Groq into a real Javascript Object
+    const aiResult = JSON.parse(data.choices[0].message.content);
 
-    // INTERCEPT HTTP ERRORS (e.g., 401 Invalid API Key, 400 Bad Request)
-    if (!response.ok) {
-      const groqErrorMessage = data.error?.message || response.statusText;
-      throw new Error(`Groq API rejected the request: ${groqErrorMessage}`);
-    }
-
-    if (!data.choices || !data.choices[0]) {
-      throw new Error("Groq API succeeded but returned an invalid structure.");
-    }
-
-    return new Response(data.choices[0].message.content, {
-      headers: { "Content-Type": "application/json" }
+    // We send ONLY the object back, so the frontend sees exactly what it expects
+    return new Response(JSON.stringify(aiResult), {
+      headers: { 
+        "Content-Type": "application/json",
+        "Access-Control-Allow-Origin": "*" 
+      }
     });
 
   } catch (error) {
-    // Expose the exact error back to the client
+    // If anything fails, we send a clear error to the console
     return new Response(JSON.stringify({ error: error.message }), { 
       status: 500,
-      headers: { "Content-Type": "application/json" }
+      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
     });
   }
 }
