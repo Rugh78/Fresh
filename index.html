@@ -202,13 +202,16 @@
   .share-btn { display:flex; align-items:center; gap:14px; width:100%; border-radius:14px; padding:15px 18px; margin-bottom:10px; text-decoration:none; border:none; cursor:pointer; }
   .share-btn.wa { background:#25D366; }
   .share-btn.lnk { background:var(--surface2); border:1.5px solid var(--border); }
+  .share-btn.primary { background:var(--accent); }
   .share-icon { font-size:26px; flex-shrink:0; }
   .share-title { font-weight:700; font-size:15px; font-family:'DM Sans',sans-serif; }
   .share-btn.wa .share-title { color:white; }
   .share-btn.lnk .share-title { color:var(--text); }
+  .share-btn.primary .share-title { color:white; }
   .share-sub { font-size:12px; margin-top:2px; }
   .share-btn.wa .share-sub { color:rgba(255,255,255,.8); }
   .share-btn.lnk .share-sub { color:var(--text-muted); }
+  .share-btn.primary .share-sub { color:rgba(255,255,255,.8); }
 
  /* Refresh Spin Animation */
   .btn-refresh-cat {
@@ -447,19 +450,23 @@
 <div class="modal-overlay bottom" id="shareModal" onclick="if(event.target===this)closeShare()">
   <div class="modal-box sheet">
     <div class="modal-title">🔗 Share List</div>
-    <div class="modal-sub">Share this code — family joins and edits live. Every list on this code (Grocery, Travel, To-Do, Custom, and any you've added) comes with it.</div>
-    <div class="code-display">
-      <div class="code-text" id="shareCode"></div>
-      <div class="code-hint">Enter this code at the home screen</div>
-    </div>
-    <a class="share-btn wa" id="waBtn" href="#" target="_blank">
-      <span class="share-icon">💬</span>
-      <div><div class="share-title">Send via WhatsApp</div><div class="share-sub">Sends list + live link to family</div></div>
-    </a>
+    <div class="modal-sub">Anyone with this link joins and edits live — including every list on this code (Grocery, Travel, To-Do, Custom, and any you've added).</div>
+    <button class="share-btn primary" id="nativeShareBtn" onclick="nativeShare()" style="display:none">
+      <span class="share-icon">📤</span>
+      <div><div class="share-title">Share via...</div><div class="share-sub">Messages, Mail, AirDrop & more</div></div>
+    </button>
     <button class="share-btn lnk" onclick="copyLink()">
       <span class="share-icon" id="copyIcon">🔗</span>
       <div><div class="share-title" id="copyText">Copy link</div><div class="share-sub">Direct link — opens straight into this list</div></div>
     </button>
+    <a class="share-btn wa" id="waBtn" href="#" target="_blank">
+      <span class="share-icon">💬</span>
+      <div><div class="share-title">Send via WhatsApp</div><div class="share-sub">Sends the link straight to a chat</div></div>
+    </a>
+    <div class="code-display">
+      <div class="code-hint" style="margin-top:0">Or enter this code at the home screen</div>
+      <div class="code-text" id="shareCode" style="font-size:26px;margin-top:4px"></div>
+    </div>
     <button class="btn-close-modal" onclick="closeShare()">Close</button>
   </div>
 </div>
@@ -1226,9 +1233,14 @@ function delTemplate(i) {
 
 function getUrl() { return `${location.origin}${location.pathname}?list=${listId}`; }
 function openShare() {
-  const text = `🛒 FreshList (Code: ${listId})\nCheck our list here: ${getUrl()}`;
+  const text = `🛒 Join our shared FreshList: ${getUrl()}`;
   document.getElementById('waBtn').href = `https://wa.me/?text=${encodeURIComponent(text)}`;
+  document.getElementById('nativeShareBtn').style.display = navigator.share ? 'flex' : 'none';
   document.getElementById('shareModal').classList.add('open');
+}
+function nativeShare() {
+  if (!navigator.share) return;
+  navigator.share({ title: 'FreshList', text: 'Join our shared FreshList:', url: getUrl() }).catch(() => {});
 }
 function closeShare() { document.getElementById('shareModal').classList.remove('open'); }
 function copyLink() {
