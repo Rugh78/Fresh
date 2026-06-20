@@ -62,9 +62,12 @@ Output: {"items": [{"name": "Charger", "quantity": 1, "unit": "", "category": "E
   todo: `You are a to-do list parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
 The user gives you tasks in any language or mix of languages.
 
+Today's date is {{TODAY}}. Use this to resolve any relative dates mentioned in tasks.
+
 Rules:
 - ALWAYS output the task name in English, regardless of the input language. Translate as needed. Phrase it as a short, actionable item (e.g. "Call dentist", not "Dentist").
 - Determine priority from urgency cues in the text: words like "urgent", "asap", "today", "important", "!!!" → High Priority. Words like "someday", "eventually", "maybe", "low priority", "whenever" → Low Priority. Otherwise → Medium Priority.
+- If a task mentions any date or deadline — "by Friday", "tomorrow", "next Monday", "June 30", "in 3 days" — resolve it to an absolute calendar date relative to today's date above, and return it as dueDate in YYYY-MM-DD format. If no date or deadline is mentioned, dueDate must be an empty string "".
 - quantity is always 1, unit is always empty.
 - Pick an emoji that represents the task itself (e.g. 📞 for calls, 📧 for emails, 🧹 for chores, 💰 for bills).
 
@@ -74,14 +77,15 @@ Each item must have:
   quantity (always 1),
   unit (always ""),
   category (one of: High Priority, Medium Priority, Low Priority),
-  emoji (single relevant emoji)
+  emoji (single relevant emoji),
+  dueDate (string, "YYYY-MM-DD" or "" if no date was mentioned)
 
-Examples:
-Input: "urgent: call the bank, water plants, maybe clean garage"
-Output: {"items": [{"name": "Call the bank", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "📞"}, {"name": "Water plants", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🪴"}, {"name": "Clean garage", "quantity": 1, "unit": "", "category": "Low Priority", "emoji": "🧹"}]}
+Example (assuming today is Monday, June 16, 2026):
+Input: "urgent: call the bank by Friday, water plants, maybe clean garage"
+Output: {"items": [{"name": "Call the bank", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "📞", "dueDate": "2026-06-20"}, {"name": "Water plants", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🪴", "dueDate": ""}, {"name": "Clean garage", "quantity": 1, "unit": "", "category": "Low Priority", "emoji": "🧹", "dueDate": ""}]}
 
-Input: "לשלם חשבון חשמל היום, לקבוע תור לרופא"
-Output: {"items": [{"name": "Pay electricity bill", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "💡"}, {"name": "Book doctor's appointment", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🩺"}]}`,
+Input: "לשלם חשבון חשמל היום, לקבוע תור לרופא מחר"
+Output: {"items": [{"name": "Pay electricity bill", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "💡", "dueDate": ""}, {"name": "Book doctor's appointment", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🩺", "dueDate": "<tomorrow's date relative to today>"}]}`,
 
   custom: `You are a generic checklist parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
 The user gives you a free-form list of items to track, in any language or mix of languages.
@@ -125,6 +129,12 @@ export async function onRequest(context) {
     const userInput = body.text || body.userInput;
     // Which list type this parse request is for: grocery | travel | todo | custom
     const listType = SYSTEM_PROMPTS[body.type] ? body.type : "grocery";
+    let systemContent = SYSTEM_PROMPTS[listType];
+    if (listType === "todo") {
+      const today = new Date();
+      const niceDate = today.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
+      systemContent = systemContent.replace("{{TODAY}}", niceDate);
+    }
 
     if (!userInput || userInput.trim() === "") {
       return new Response(JSON.stringify({ error: "No input provided" }), {
@@ -142,7 +152,7 @@ export async function onRequest(context) {
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
         messages: [
-          { role: "system", content: SYSTEM_PROMPTS[listType] },
+          { role: "system", content: systemContent },
           { role: "user", content: userInput }
         ],
         temperature: 0,
