@@ -652,9 +652,12 @@ function syncItemSubscriptions(ids) {
   });
 }
 
-// --- 6. TABS (with drag-to-reorder) ---
-let tabDrag = null;
+// --- 6. TABS (long-press, then drag, to reorder) ---
+let tabPress = null;       // pending long-press, not yet armed
+let tabDrag = null;        // armed and actively dragging
 let lastTabDragEnd = 0;
+const LONG_PRESS_MS = 380;
+const MOVE_CANCEL_PX = 10;
 
 function renderTabs() {
   const wrap = document.getElementById('typeTabs');
@@ -678,55 +681,97 @@ function attachTabDrag() {
   tabs.forEach(el => {
     el.addEventListener('pointerdown', e => {
       if (e.pointerType === 'mouse' && e.button !== 0) return;
-      el.style.touchAction = 'none';
-      tabDrag = { id: el.dataset.id, el, startX: e.clientX, dragging: false, others: tabs.filter(t => t !== el) };
-      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+      if (tabPress || tabDrag) return;
+
+      const pointerId = e.pointerId;
+      const startX = e.clientX, startY = e.clientY;
+
+      const timer = setTimeout(() => armDrag(), LONG_PRESS_MS);
+
+      tabPress = { el, pointerId, startX, startY, timer, tabs };
+
+      document.addEventListener('pointermove', onDocMove);
+      document.addEventListener('pointerup', onDocUp);
+      document.addEventListener('pointercancel', onDocUp);
     });
-    el.addEventListener('pointermove', e => {
-      if (!tabDrag || tabDrag.el !== el) return;
-      const dx = e.clientX - tabDrag.startX;
-      if (!tabDrag.dragging && Math.abs(dx) > 8) {
-        tabDrag.dragging = true;
-        el.style.transition = 'none';
-        el.style.zIndex = 50;
-        el.style.boxShadow = '0 6px 18px rgba(0,0,0,.3)';
-      }
-      if (tabDrag.dragging) {
-        e.preventDefault();
-        el.style.transform = `translateX(${dx}px)`;
-      }
-    });
-    el.addEventListener('pointerup', e => finishTabDrag(e, el));
-    el.addEventListener('pointercancel', e => finishTabDrag(e, el));
   });
 }
 
-function finishTabDrag(e, el) {
-  el.style.touchAction = '';
-  if (!tabDrag || tabDrag.el !== el) { tabDrag = null; return; }
-  const wasDragging = tabDrag.dragging;
-  if (wasDragging) {
-    const pointerX = e.clientX;
-    const others = tabDrag.others;
-    let targetIndex = others.length;
-    for (let i = 0; i < others.length; i++) {
-      const r = others[i].getBoundingClientRect();
-      const center = r.left + r.width / 2;
-      if (pointerX < center) { targetIndex = i; break; }
-    }
-    const draggedId = tabDrag.id;
-    const newOrder = boardOrderIds().filter(id => id !== draggedId);
-    newOrder.splice(targetIndex, 0, draggedId);
-    const updates = {};
-    newOrder.forEach((id, i) => { updates[`${id}/order`] = i; });
-    db.ref(`lists/${listId}/boards`).update(updates);
-    el.style.transform = '';
-    el.style.boxShadow = '';
-    el.style.zIndex = '';
-    el.style.transition = '';
-    lastTabDragEnd = Date.now();
+function armDrag() {
+  if (!tabPress) return;
+  const { el, pointerId, startX, tabs } = tabPress;
+  clearTimeout(tabPress.timer);
+  el.style.touchAction = 'none';
+  try { el.setPointerCapture(pointerId); } catch (err) {}
+  el.style.transition = 'none';
+  el.style.zIndex = 50;
+  el.style.boxShadow = '0 8px 22px rgba(0,0,0,.35)';
+  el.style.transform = 'scale(1.06)';
+  if (navigator.vibrate) { try { navigator.vibrate(10); } catch (err) {} }
+  tabDrag = { id: el.dataset.id, el, pointerId, baseX: startX, others: tabs.filter(t => t !== el) };
+  tabPress = null;
+}
+
+function onDocMove(e) {
+  if (tabDrag && e.pointerId === tabDrag.pointerId) {
+    e.preventDefault();
+    const dx = e.clientX - tabDrag.baseX;
+    tabDrag.el.style.transform = `translateX(${dx}px) scale(1.06)`;
+    tabDrag.lastX = e.clientX;
+    return;
   }
+  if (tabPress && e.pointerId === tabPress.pointerId) {
+    const dx = e.clientX - tabPress.startX, dy = e.clientY - tabPress.startY;
+    if (Math.abs(dx) > MOVE_CANCEL_PX || Math.abs(dy) > MOVE_CANCEL_PX) {
+      // Real movement before the long-press fired — this is a scroll/tap, not a drag.
+      clearTimeout(tabPress.timer);
+      cleanupPress();
+    }
+  }
+}
+
+function onDocUp(e) {
+  if (tabDrag && e.pointerId === tabDrag.pointerId) {
+    finishTabDrag(tabDrag.lastX ?? e.clientX);
+    return;
+  }
+  if (tabPress && e.pointerId === tabPress.pointerId) {
+    clearTimeout(tabPress.timer);
+    cleanupPress();
+  }
+}
+
+function cleanupPress() {
+  tabPress = null;
+  document.removeEventListener('pointermove', onDocMove);
+  document.removeEventListener('pointerup', onDocUp);
+  document.removeEventListener('pointercancel', onDocUp);
+}
+
+function finishTabDrag(pointerX) {
+  const el = tabDrag.el;
+  el.style.touchAction = '';
+  const others = tabDrag.others;
+  let targetIndex = others.length;
+  for (let i = 0; i < others.length; i++) {
+    const r = others[i].getBoundingClientRect();
+    const center = r.left + r.width / 2;
+    if (pointerX < center) { targetIndex = i; break; }
+  }
+  const draggedId = tabDrag.id;
+  const newOrder = boardOrderIds().filter(id => id !== draggedId);
+  newOrder.splice(targetIndex, 0, draggedId);
+  const updates = {};
+  newOrder.forEach((id, i) => { updates[`${id}/order`] = i; });
+  db.ref(`lists/${listId}/boards`).update(updates);
+
+  el.style.transform = '';
+  el.style.boxShadow = '';
+  el.style.zIndex = '';
+  el.style.transition = '';
+  lastTabDragEnd = Date.now();
   tabDrag = null;
+  cleanupPress();
 }
 
 function selectBoard(id) {
