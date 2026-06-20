@@ -40,7 +40,7 @@
   button { cursor:pointer; font-family:'DM Sans',sans-serif; }
   button:active { opacity:.75; }
   input:focus { outline:none; }
-  ::-webkit-scrollbar { width:6px; }
+  ::-webkit-scrollbar { width:6px; height:6px; }
   ::-webkit-scrollbar-thumb { background:var(--border); border-radius:3px; }
 
   /* Pages */
@@ -55,7 +55,7 @@
   #landing.active { display:flex; }
   .landing-icon { font-size:64px; margin-bottom:16px; }
   .landing-title { font-family:'Playfair Display',serif; font-size:34px; font-weight:700; color:var(--text); margin-bottom:10px; }
-  .landing-sub { font-size:15px; color:var(--text-muted); margin-bottom:44px; max-width:260px; line-height:1.6; }
+  .landing-sub { font-size:15px; color:var(--text-muted); margin-bottom:44px; max-width:280px; line-height:1.6; }
   .landing-btns { width:100%; max-width:320px; }
   .btn-primary { width:100%; background:var(--accent); color:white; border:none; border-radius:14px; padding:16px; font-weight:700; font-size:17px; margin-bottom:12px; box-shadow:0 4px 20px rgba(63,140,43,.35); display:block; }
   .btn-secondary { width:100%; background:var(--surface); color:var(--text); border:1.5px solid var(--border); border-radius:14px; padding:16px; font-weight:700; font-size:17px; display:block; }
@@ -65,6 +65,8 @@
   #joinInput { flex:1; min-width:0; background:var(--surface); border:1.5px solid var(--border); border-radius:10px; padding:13px 14px; color:var(--text); font-size:20px; font-family:'DM Sans',sans-serif; font-weight:700; letter-spacing:.12em; text-transform:uppercase; }
   .btn-join { flex-shrink:0; background:var(--accent); color:white; border:none; border-radius:10px; padding:13px 20px; font-weight:700; font-size:15px; }
   .dark-toggle-landing { margin-top:32px; background:none; border:none; font-size:24px; }
+  .landing-types { display:flex; gap:10px; margin-bottom:36px; flex-wrap:wrap; justify-content:center; }
+  .landing-type-pill { display:flex; align-items:center; gap:6px; background:var(--surface); border:1.5px solid var(--border); border-radius:20px; padding:7px 13px; font-size:12px; font-weight:700; color:var(--text-muted); }
 
   /* ── APP ── */
   #app { display:none; flex-direction:column; }
@@ -90,8 +92,16 @@
   .menu-danger { color:#e05555; }
   .chip { font-size:11px; padding:2px 8px; border-radius:20px; background:var(--muted); color:var(--text-muted); font-weight:700; }
 
+  /* Type tabs */
+  .type-tabs { display:flex; gap:8px; padding:14px 16px 0; max-width:700px; margin:0 auto; width:100%; overflow-x:auto; scrollbar-width:none; }
+  .type-tabs::-webkit-scrollbar { display:none; }
+  .type-tab { flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text-muted); font-weight:700; font-size:13px; white-space:nowrap; transition:all .15s; }
+  .type-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 3px 12px rgba(63,140,43,.3); }
+  .tab-badge { background:var(--muted); color:var(--text-muted); border-radius:10px; padding:1px 6px; font-size:11px; font-weight:700; }
+  .type-tab.active .tab-badge { background:rgba(255,255,255,.25); color:#fff; }
+
   /* Main */
-  #main { padding:20px 16px; max-width:700px; margin:0 auto; width:100%; }
+  #main { padding:16px 16px 20px; max-width:700px; margin:0 auto; width:100%; }
 
   /* Input card */
   .input-card { background:var(--surface); border-radius:16px; padding:16px; box-shadow:0 4px 20px var(--shadow); margin-bottom:18px; border:1.5px solid var(--border); }
@@ -190,7 +200,7 @@
     transition: all 0.2s;
   }
   .btn-refresh-cat:active { transform: scale(0.9); }
-  
+
   @keyframes spin {
     from { transform: rotate(0deg); }
     to { transform: rotate(360deg); }
@@ -199,63 +209,63 @@
     display: inline-block;
     animation: spin 1s linear infinite;
   }
- 
-/* ── TEMPLATES (Missing Styling) ── */
-  .tpl-item { 
-    background: var(--surface2); 
+
+/* ── TEMPLATES ── */
+  .tpl-item {
+    background: var(--surface2);
     border: 1.5px solid var(--border);
-    border-radius: 14px; 
-    padding: 16px; 
-    margin-bottom: 12px; 
-    display: flex; 
-    align-items: center; 
-    gap: 12px; 
+    border-radius: 14px;
+    padding: 16px;
+    margin-bottom: 12px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
   }
-  .tpl-name { 
-    font-weight: 700; 
-    color: var(--text); 
-    font-size: 16px; 
+  .tpl-name {
+    font-weight: 700;
+    color: var(--text);
+    font-size: 16px;
     display: block;
   }
-  .tpl-meta { 
-    font-size: 12px; 
-    color: var(--text-muted); 
+  .tpl-meta {
+    font-size: 12px;
+    color: var(--text-muted);
     font-weight: 600;
-    margin-top: 2px; 
+    margin-top: 2px;
     text-transform: uppercase;
   }
-  .btn-load { 
-    background: var(--accent); 
-    color: white; 
-    border: none; 
-    border-radius: 10px; 
-    padding: 10px 18px; 
-    font-weight: 700; 
-    font-size: 14px; 
+  .btn-load {
+    background: var(--accent);
+    color: white;
+    border: none;
+    border-radius: 10px;
+    padding: 10px 18px;
+    font-weight: 700;
+    font-size: 14px;
     box-shadow: 0 4px 10px rgba(63,140,43,0.2);
   }
-  .btn-del-tpl { 
-    background: #fee2e2; 
-    border: none; 
+  .btn-del-tpl {
+    background: #fee2e2;
+    border: none;
     border-radius: 10px;
     width: 40px;
     height: 40px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 18px; 
+    font-size: 18px;
   }
-  .tpl-scroll { 
-    max-height: 50vh; 
-    overflow-y: auto; 
+  .tpl-scroll {
+    max-height: 50vh;
+    overflow-y: auto;
     margin-top: 15px;
   }
-  .tpl-empty { 
-    text-align: center; 
-    padding: 40px 20px; 
+  .tpl-empty {
+    text-align: center;
+    padding: 40px 20px;
     color: var(--text-muted);
   }
- 
+
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
 </style>
@@ -265,7 +275,13 @@
 <div id="landing" class="page active">
   <div class="landing-icon">🛒</div>
   <div class="landing-title">FreshList</div>
-  <div class="landing-sub">A live shared grocery list for the whole family</div>
+  <div class="landing-sub">One shared, live list — for groceries, trips, to-dos & more</div>
+  <div class="landing-types">
+    <div class="landing-type-pill">🛒 Grocery</div>
+    <div class="landing-type-pill">🧳 Travel</div>
+    <div class="landing-type-pill">✅ To-Do</div>
+    <div class="landing-type-pill">📝 Custom</div>
+  </div>
   <div class="landing-btns">
     <button class="btn-primary" onclick="createNewList()">✨ Create new list</button>
     <button class="btn-secondary" onclick="toggleJoin()">🔗 Join existing list</button>
@@ -285,7 +301,7 @@
 <div id="app" class="page">
   <div id="header">
     <div class="header-left">
-      <span style="font-size:26px;flex-shrink:0">🛒</span>
+      <span style="font-size:26px;flex-shrink:0" id="headerEmoji">🛒</span>
       <div class="header-titles">
         <div class="header-title">FreshList</div>
         <div class="header-sub">
@@ -308,15 +324,17 @@
           </button>
           <button class="menu-item" onclick="openSaveTemplate();closeMenu()">💾 Save as template</button>
           <div class="menu-divider"></div>
-          <button class="menu-item menu-danger" onclick="clearList();closeMenu()">🗑️ Clear list</button>
+          <button class="menu-item menu-danger" onclick="clearList();closeMenu()">🗑️ Clear this list</button>
         </div>
       </div>
     </div>
   </div>
 
+  <div class="type-tabs" id="typeTabs"></div>
+
   <div id="main">
     <div class="input-card">
-      <div class="input-label">ADD ITEMS — separate with commas</div>
+      <div class="input-label" id="inputLabel">ADD ITEMS — separate with commas</div>
       <input id="itemInput" placeholder='"2 milk, eggs, bread..."'
         onkeydown="if(event.key==='Enter')addItems()">
       <button class="btn-add" id="addBtn" onclick="addItems()">+ Add Items</button>
@@ -333,9 +351,9 @@
     </div>
 
     <div class="empty-state" id="emptyState">
-      <div class="empty-icon">🥦</div>
-      <div class="empty-title">List is empty</div>
-      <div class="empty-sub">Type items above — AI will sort & categorize them</div>
+      <div class="empty-icon" id="emptyIcon">🥦</div>
+      <div class="empty-title" id="emptyTitle">List is empty</div>
+      <div class="empty-sub" id="emptySub">Type items above — AI will sort & categorize them</div>
     </div>
 
     <div id="itemsList"></div>
@@ -345,7 +363,7 @@
 <div class="modal-overlay" id="saveTplModal" onclick="if(event.target===this)closeSaveTemplate()">
   <div class="modal-box">
     <div class="modal-title">💾 Save Template</div>
-    <div class="modal-sub">Give this list a name to reuse it later</div>
+    <div class="modal-sub" id="saveTplSub">Give this list a name to reuse it later</div>
     <input class="modal-input" id="tplNameInput" placeholder="e.g. Weekly Essentials"
       onkeydown="if(event.key==='Enter')saveTemplate()">
     <div class="modal-row">
@@ -366,7 +384,7 @@
 <div class="modal-overlay bottom" id="shareModal" onclick="if(event.target===this)closeShare()">
   <div class="modal-box sheet">
     <div class="modal-title">🔗 Share List</div>
-    <div class="modal-sub">Share this code — family joins and edits live</div>
+    <div class="modal-sub">Share this code — family joins and edits live. All list types (Grocery, Travel, To-Do, Custom) are included.</div>
     <div class="code-display">
       <div class="code-text" id="shareCode"></div>
       <div class="code-hint">Enter this code at the home screen</div>
@@ -393,13 +411,62 @@ const firebaseConfig = {
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
-// --- 2. STATE ---
-const CATS = ["Produce","Dairy","Bakery","Meat & Seafood","Frozen","Pantry","Beverages","Snacks","Household","Personal Care","Other"];
-let listId = null, items = {}, dbUnsub = null;
+// --- 2. LIST TYPE CONFIG ---
+// Every shareable code holds ALL of these list types at once, under
+// lists/{listId}/{type}/items — the tabs just switch which one you're viewing.
+const LIST_TYPES = {
+  grocery: {
+    label: 'Grocery', icon: '🛒',
+    cats: ["Produce","Dairy","Bakery","Meat & Seafood","Frozen","Pantry","Beverages","Snacks","Household","Personal Care","Other"],
+    hasQty: true,
+    inputLabel: 'ADD ITEMS — separate with commas',
+    placeholder: '"2 milk, eggs, bread..."',
+    addBtnLabel: '+ Add Items',
+    emptyIcon: '🥦', emptyTitle: 'List is empty', emptySub: 'Type items above — AI will sort & categorize them'
+  },
+  travel: {
+    label: 'Travel', icon: '🧳',
+    cats: ["Clothing","Toiletries","Electronics","Documents","Health & Meds","Gear","Other"],
+    hasQty: true,
+    inputLabel: 'ADD PACKING ITEMS — separate with commas',
+    placeholder: '"passport, 3 shirts, charger..."',
+    addBtnLabel: '+ Add to Packing List',
+    emptyIcon: '🧳', emptyTitle: 'Nothing packed yet', emptySub: 'Type items above — AI will sort by packing category'
+  },
+  todo: {
+    label: 'To-Do', icon: '✅',
+    cats: ["High Priority","Medium Priority","Low Priority"],
+    hasQty: false,
+    inputLabel: 'ADD TASKS — separate with commas',
+    placeholder: '"call dentist, finish report..."',
+    addBtnLabel: '+ Add Tasks',
+    emptyIcon: '🗒️', emptyTitle: 'No tasks yet', emptySub: 'Type tasks above — AI will set the priority'
+  },
+  custom: {
+    label: 'Custom', icon: '📝',
+    cats: [],
+    hasQty: false,
+    inputLabel: 'ADD ITEMS — separate with commas',
+    placeholder: '"anything you want to track..."',
+    addBtnLabel: '+ Add Items',
+    emptyIcon: '📝', emptyTitle: 'List is empty', emptySub: 'Type anything above to start your checklist'
+  }
+};
+const TYPE_KEYS = Object.keys(LIST_TYPES);
+
+// --- 3. STATE ---
+let listId = null;
+let currentType = localStorage.getItem('fl-type') || 'grocery';
+if (!LIST_TYPES[currentType]) currentType = 'grocery';
+let itemsByType = { grocery:{}, travel:{}, todo:{}, custom:{} };
+let dbUnsub = null;
 let templates = JSON.parse(localStorage.getItem('fl-tpl') || '[]');
 let dark = localStorage.getItem('fl-dark') === 'true';
 
-// --- 3. LIFECYCLE ---
+function curItems() { return itemsByType[currentType]; }
+function curCfg() { return LIST_TYPES[currentType]; }
+
+// --- 4. LIFECYCLE ---
 window.addEventListener('load', () => {
   applyDark();
   const urlParams = new URLSearchParams(window.location.search);
@@ -440,20 +507,23 @@ function enterList(id) {
   listId = id;
   // Save to persistence
   localStorage.setItem('fl-last-list', id);
-  
+
   const url = new URL(window.location);
   url.searchParams.set('list', id);
   window.history.replaceState({}, '', url);
   document.getElementById('listCode').textContent = id;
   document.getElementById('shareCode').textContent = id;
   showPage('app');
+  updateInputUI();
+  renderTabs();
   subscribeToList();
   updateTplCount();
 }
 
 function switchList() {
   if (dbUnsub) { dbUnsub(); dbUnsub = null; }
-  listId = null; items = {};
+  listId = null;
+  itemsByType = { grocery:{}, travel:{}, todo:{}, custom:{} };
   localStorage.removeItem('fl-last-list');
   window.history.replaceState({}, '', window.location.pathname);
   document.getElementById('joinInput').value = '';
@@ -462,22 +532,71 @@ function switchList() {
 }
 
 function subscribeToList() {
-  const r = db.ref(`lists/${listId}/items`);
-  dbUnsub = () => r.off();
-  r.on('value', snap => {
-    document.getElementById('statusDot').classList.add('online');
-    items = snap.val() || {};
-    renderList();
+  const offFns = [];
+  TYPE_KEYS.forEach(type => {
+    const r = db.ref(`lists/${listId}/${type}/items`);
+    const handler = snap => {
+      document.getElementById('statusDot').classList.add('online');
+      itemsByType[type] = snap.val() || {};
+      renderTabs();
+      if (type === currentType) renderList();
+    };
+    r.on('value', handler);
+    offFns.push(() => r.off('value', handler));
   });
+  dbUnsub = () => offFns.forEach(f => f());
 }
 
-// --- 4. ACTIONS ---
+// --- 5. TABS ---
+function renderTabs() {
+  const wrap = document.getElementById('typeTabs');
+  wrap.innerHTML = TYPE_KEYS.map(key => {
+    const cfg = LIST_TYPES[key];
+    const count = Object.keys(itemsByType[key] || {}).length;
+    return `<button class="type-tab${key === currentType ? ' active' : ''}" onclick="selectType('${key}')">
+      <span>${cfg.icon}</span><span>${cfg.label}</span>${count ? `<span class="tab-badge">${count}</span>` : ''}
+    </button>`;
+  }).join('');
+}
+
+function selectType(type) {
+  if (type === currentType || !LIST_TYPES[type]) return;
+  currentType = type;
+  localStorage.setItem('fl-type', type);
+  document.getElementById('itemInput').value = '';
+  document.getElementById('errorMsg').style.display = 'none';
+  updateInputUI();
+  renderTabs();
+  renderList();
+}
+
+function updateInputUI() {
+  const cfg = curCfg();
+  document.getElementById('headerEmoji').textContent = cfg.icon;
+  document.getElementById('inputLabel').textContent = cfg.inputLabel;
+  document.getElementById('itemInput').placeholder = cfg.placeholder;
+  document.getElementById('addBtn').textContent = cfg.addBtnLabel;
+  document.getElementById('emptyIcon').textContent = cfg.emptyIcon;
+  document.getElementById('emptyTitle').textContent = cfg.emptyTitle;
+  document.getElementById('emptySub').textContent = cfg.emptySub;
+}
+
+// --- 6. ACTIONS ---
+function fallbackCategory() {
+  const cfg = curCfg();
+  if (currentType === 'todo') return 'Medium Priority';
+  if (cfg.cats.includes('Other')) return 'Other';
+  if (cfg.cats.length === 0) return 'General';
+  return cfg.cats[0];
+}
+
 async function addItems() {
   const input = document.getElementById('itemInput');
   const btn = document.getElementById('addBtn');
   const err = document.getElementById('errorMsg');
   const rawValue = input.value.trim();
-  
+  const cfg = curCfg();
+
   if (!rawValue || btn.disabled) return;
 
   btn.disabled = true;
@@ -488,7 +607,7 @@ async function addItems() {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: rawValue })
+      body: JSON.stringify({ text: rawValue, type: currentType })
     });
 
     if (!response.ok) throw new Error("API Offline");
@@ -500,11 +619,11 @@ async function addItems() {
     if (itemList.length === 0) throw new Error("No items parsed");
 
     for (const item of itemList) {
-      await db.ref(`lists/${listId}/items`).push({
+      await db.ref(`lists/${listId}/${currentType}/items`).push({
         name: item.name || "Unknown Item",
         quantity: item.quantity || 1,
         unit: item.unit || "",
-        category: item.category || "Other",
+        category: item.category || fallbackCategory(),
         emoji: item.emoji || "📦",
         checked: false,
         addedAt: Date.now()
@@ -517,11 +636,11 @@ async function addItems() {
     // FALLBACK: Manual split and add
     const splitItems = rawValue.split(',').map(s => s.trim()).filter(s => s.length > 0);
     for (const name of splitItems) {
-        await db.ref(`lists/${listId}/items`).push({
+        await db.ref(`lists/${listId}/${currentType}/items`).push({
             name: name,
             quantity: 1,
             unit: "",
-            category: "Other",
+            category: fallbackCategory(),
             emoji: "📦",
             checked: false,
             addedAt: Date.now()
@@ -533,12 +652,14 @@ async function addItems() {
     setTimeout(() => { err.style.display = 'none'; }, 3000);
   } finally {
     btn.disabled = false;
-    btn.textContent = '+ Add Items';
+    btn.textContent = cfg.addBtnLabel;
   }
 }
 
-// --- 5. RENDERING ---
+// --- 7. RENDERING ---
 function renderList() {
+  const cfg = curCfg();
+  const items = curItems();
   const arr = Object.entries(items).map(([id, v]) => ({...v, id}));
   const total = arr.length;
   const checked = arr.filter(i => i.checked).length;
@@ -559,38 +680,45 @@ function renderList() {
   const done = arr.filter(i => i.checked);
   let html = '';
 
-  CATS.forEach(cat => {
-    const its = unchecked.filter(i => i.category === cat);
-    if (!its.length) return;
-    html += `<div class="cat-card">
-      <div class="cat-label">${cat} <span class="chip">${its.length}</span></div>
-      ${its.map(itemHTML).join('')}
-    </div>`;
-  });
+  if (cfg.cats.length) {
+    cfg.cats.forEach(cat => {
+      const its = unchecked.filter(i => i.category === cat);
+      if (!its.length) return;
+      html += `<div class="cat-card">
+        <div class="cat-label">${cat} <span class="chip">${its.length}</span></div>
+        ${its.map(i => itemHTML(i, cfg)).join('')}
+      </div>`;
+    });
 
-  // 2. Render "Uncategorized" items with a Refresh Button
-  const uncategorized = unchecked.filter(i => !CATS.includes(i.category) || i.category === 'Other');
-  if (uncategorized.length) {
+    // Items whose category didn't match any known bucket
+    const uncategorized = unchecked.filter(i => !cfg.cats.includes(i.category));
+    if (uncategorized.length) {
+      html += `<div class="cat-card">
+        <div class="cat-label">
+          Other/Misc <span class="chip">${uncategorized.length}</span>
+          <button class="btn-refresh-cat" id="reCatBtn" onclick="recategorizeOther()">
+            <span id="reCatIcon">✨</span> Fix with AI
+          </button>
+        </div>
+        ${uncategorized.map(i => itemHTML(i, cfg)).join('')}
+      </div>`;
+    }
+  } else if (unchecked.length) {
+    // Flat checklist — no categories (e.g. Custom lists)
     html += `<div class="cat-card">
-      <div class="cat-label">
-        Other/Misc <span class="chip">${uncategorized.length}</span>
-        <button class="btn-refresh-cat" id="reCatBtn" onclick="recategorizeOther()">
-          <span id="reCatIcon">✨</span> Fix with AI
-        </button>
-      </div>
-      ${uncategorized.map(itemHTML).join('')}
+      ${unchecked.map(i => itemHTML(i, cfg)).join('')}
     </div>`;
   }
 
   if (done.length) {
     html += `<div class="cat-card completed-card">
       <div class="cat-label completed">✓ Completed <span class="chip">${done.length}</span></div>
-      ${done.map(itemHTML).join('')}
+      ${done.map(i => itemHTML(i, cfg)).join('')}
     </div>`;
   }
 
   document.getElementById('itemsList').innerHTML = html;
-  attachSwipe();
+  attachSwipe(cfg);
 }
 
 function escapeHTML(str) {
@@ -601,16 +729,10 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
-function itemHTML(item) {
-  const qtyLabel = item.quantity > 1 ? `<span class="item-qty">${item.quantity}${item.unit?' '+item.unit:''}×</span>` : '';
-  return `<div class="item-wrap" id="wrap-${item.id}">
-    <div class="item-row${item.checked?' checked':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
-      <div class="item-checkbox${item.checked?' checked':''}">${item.checked?'✓':''}</div>
-      <span class="item-emoji">${escapeHTML(item.emoji)}</span>
-      <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(item.name)}</span>
-    </div>
-    <div class="swipe-hint">← del · edit →</div>
-    <div class="qty-panel" id="qp-${item.id}">
+function itemHTML(item, cfg) {
+  const qtyLabel = (cfg.hasQty && item.quantity > 1) ? `<span class="item-qty">${item.quantity}${item.unit?' '+item.unit:''}×</span>` : '';
+  const hint = cfg.hasQty ? '← del · edit →' : '← delete';
+  const qtyPanel = cfg.hasQty ? `<div class="qty-panel" id="qp-${item.id}">
       <span class="qty-label">Qty</span>
       <div class="qty-controls">
         <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',-1)">−</button>
@@ -622,14 +744,25 @@ function itemHTML(item) {
         <button class="btn-save" onclick="event.stopPropagation();saveQty('${item.id}')">✓ Save</button>
         <button class="btn-cancel" onclick="event.stopPropagation();closeQty('${item.id}')">Cancel</button>
       </div>
+    </div>` : '';
+  return `<div class="item-wrap" id="wrap-${item.id}">
+    <div class="item-row${item.checked?' checked':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
+      <div class="item-checkbox${item.checked?' checked':''}">${item.checked?'✓':''}</div>
+      <span class="item-emoji">${escapeHTML(item.emoji)}</span>
+      <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(item.name)}</span>
     </div>
+    <div class="swipe-hint">${hint}</div>
+    ${qtyPanel}
   </div>`;
 }
 
-function toggleItem(id) { db.ref(`lists/${listId}/items/${id}`).update({ checked: !items[id]?.checked }); }
-function deleteItem(id) { db.ref(`lists/${listId}/items/${id}`).remove(); }
-function updateQty(id, qty) { db.ref(`lists/${listId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
-function clearList() { if (confirm('Clear the entire list?')) db.ref(`lists/${listId}/items`).remove(); }
+function toggleItem(id) { db.ref(`lists/${listId}/${currentType}/items/${id}`).update({ checked: !curItems()[id]?.checked }); }
+function deleteItem(id) { db.ref(`lists/${listId}/${currentType}/items/${id}`).remove(); }
+function updateQty(id, qty) { db.ref(`lists/${listId}/${currentType}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
+function clearList() {
+  const cfg = curCfg();
+  if (confirm(`Clear the entire ${cfg.label} list?`)) db.ref(`lists/${listId}/${currentType}/items`).remove();
+}
 
 function adj(id, d) {
   const inp = document.getElementById(`qi-${id}`);
@@ -653,17 +786,17 @@ function closeQty(id) {
   if (w) w.style.borderRadius = '12px';
 }
 
-function attachSwipe() {
-  Object.keys(items).forEach(id => {
+function attachSwipe(cfg) {
+  Object.keys(curItems()).forEach(id => {
     const row = document.getElementById(`row-${id}`);
     if (!row) return;
     let sx = null, sy = null, cx = 0, cy = 0;
     const THRESH = 60;
 
-    row.addEventListener('touchstart', e => { 
-        sx = e.touches[0].clientX; 
+    row.addEventListener('touchstart', e => {
+        sx = e.touches[0].clientX;
         sy = e.touches[0].clientY;
-        row.style.transition = 'none'; 
+        row.style.transition = 'none';
     }, {passive:true});
 
     row.addEventListener('touchmove', e => {
@@ -687,7 +820,7 @@ function attachSwipe() {
       row.style.transition = 'transform 0.2s ease-out';
       row.style.transform = 'translateX(0)';
       if (Math.abs(cx) > Math.abs(cy)) { // Only trigger if horizontal movement was dominant
-          if (cx > THRESH) openQty(id);
+          if (cx > THRESH && cfg.hasQty) openQty(id);
           else if (cx < -THRESH) deleteItem(id);
       }
       sx = null; sy = null; cx = 0; cy = 0;
@@ -695,13 +828,14 @@ function attachSwipe() {
   });
 }
 
- async function recategorizeOther() {
+async function recategorizeOther() {
   const btn = document.getElementById('reCatBtn');
   const icon = document.getElementById('reCatIcon');
-  
-  // 1. Find all items currently in "Other" that aren't checked
-  const otherItems = Object.entries(items)
-    .filter(([id, val]) => (!CATS.includes(val.category) || val.category === 'Other') && !val.checked)
+  const cfg = curCfg();
+
+  // 1. Find all items currently outside the known category buckets, not checked
+  const otherItems = Object.entries(curItems())
+    .filter(([id, val]) => !cfg.cats.includes(val.category) && !val.checked)
     .map(([id, val]) => ({ id, name: val.name }));
 
   if (otherItems.length === 0) return;
@@ -717,7 +851,7 @@ function attachSwipe() {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: namesString })
+      body: JSON.stringify({ text: namesString, type: currentType })
     });
 
     if (!response.ok) throw new Error("Retry failed");
@@ -725,7 +859,7 @@ function attachSwipe() {
     const data = await response.json();
     const newItems = data.items || [];
 
-    // FIX 3: Build a name->id lookup instead of fragile inline find()
+    // Build a name->id lookup instead of fragile inline find()
     const nameToId = {};
     otherItems.forEach(o => { nameToId[o.name.toLowerCase()] = o.id; });
 
@@ -741,7 +875,7 @@ function attachSwipe() {
       }
 
       if (matchedId) {
-        await db.ref(`lists/${listId}/items/${matchedId}`).update({
+        await db.ref(`lists/${listId}/${currentType}/items/${matchedId}`).update({
           category: newItem.category,
           emoji: newItem.emoji,
           name: newItem.name
@@ -757,7 +891,7 @@ function attachSwipe() {
     icon.textContent = '✨';
   }
 }
- 
+
 function applyDark() {
   document.body.classList.toggle('dark', dark);
   const icon = dark ? '☀️' : '🌙';
@@ -767,43 +901,65 @@ function toggleDark() { dark = !dark; localStorage.setItem('fl-dark', dark); app
 function toggleMenu() { document.getElementById('menuDropdown').classList.toggle('open'); }
 function closeMenu() { document.getElementById('menuDropdown').classList.remove('open'); }
 
+// --- 8. TEMPLATES (each template remembers which list type it belongs to) ---
 function updateTplCount() {
   const el = document.getElementById('tplCount');
   if (!el) return;
   el.style.display = templates.length ? 'inline' : 'none';
   el.textContent = templates.length;
 }
-function openSaveTemplate() { document.getElementById('saveTplModal').classList.add('open'); }
+function openSaveTemplate() {
+  const cfg = curCfg();
+  const count = Object.keys(curItems()).length;
+  document.getElementById('saveTplSub').textContent =
+    `Save your current ${cfg.icon} ${cfg.label} list (${count} item${count===1?'':'s'}) to reuse later`;
+  document.getElementById('saveTplModal').classList.add('open');
+}
 function closeSaveTemplate() { document.getElementById('saveTplModal').classList.remove('open'); }
 function saveTemplate() {
   const name = document.getElementById('tplNameInput').value.trim();
   if (!name) return;
-  templates.push({ name, items: Object.values(items).map(v => ({...v, checked:false})), date: Date.now() });
+  templates.push({
+    name,
+    type: currentType,
+    items: Object.values(curItems()).map(v => ({...v, checked:false})),
+    date: Date.now()
+  });
   localStorage.setItem('fl-tpl', JSON.stringify(templates));
+  document.getElementById('tplNameInput').value = '';
   updateTplCount();
   closeSaveTemplate();
 }
 function openTemplates() {
   const c = document.getElementById('tplListContent');
   c.innerHTML = templates.length
-    ? templates.map((t,i) => `
+    ? templates.map((t,i) => {
+        const tCfg = LIST_TYPES[t.type] || LIST_TYPES.grocery;
+        return `
       <div class="tpl-item">
         <div style="flex:1">
-          <span class="tpl-name">${t.name}</span>
-          <div class="tpl-meta">${t.items.length} items</div>
+          <span class="tpl-name">${tCfg.icon} ${escapeHTML(t.name)}</span>
+          <div class="tpl-meta">${tCfg.label} · ${t.items.length} items</div>
         </div>
         <button class="btn-load" onclick="loadTemplate(${i})">Load</button>
         <button class="btn-del-tpl" onclick="delTemplate(${i})">🗑️</button>
-      </div>`).join('')
-    : '<div class="tpl-empty">No templates yet. Create one via the menu!</div>';
+      </div>`;
+      }).join('')
+    : '<div class="tpl-empty">No templates yet. Save one from any list via the menu!</div>';
   document.getElementById('tplListModal').classList.add('open');
 }
 function closeTemplates() { document.getElementById('tplListModal').classList.remove('open'); }
 async function loadTemplate(i) {
-  await db.ref(`lists/${listId}/items`).remove();
-  for (const item of templates[i].items) {
-      await db.ref(`lists/${listId}/items`).push({...item});
+  const t = templates[i];
+  const type = LIST_TYPES[t.type] ? t.type : 'grocery';
+  await db.ref(`lists/${listId}/${type}/items`).remove();
+  for (const item of t.items) {
+      await db.ref(`lists/${listId}/${type}/items`).push({...item});
   }
+  currentType = type;
+  localStorage.setItem('fl-type', type);
+  updateInputUI();
+  renderTabs();
   closeTemplates();
 }
 function delTemplate(i) {
