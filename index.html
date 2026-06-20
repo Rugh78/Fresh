@@ -95,10 +95,12 @@
   /* Type tabs */
   .type-tabs { display:flex; gap:8px; padding:14px 16px 0; max-width:700px; margin:0 auto; width:100%; overflow-x:auto; scrollbar-width:none; }
   .type-tabs::-webkit-scrollbar { display:none; }
-  .type-tab { flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text-muted); font-weight:700; font-size:13px; white-space:nowrap; transition:all .15s; }
+  .type-tab { flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text-muted); font-weight:700; font-size:13px; white-space:nowrap; transition:all .15s; max-width:180px; overflow:hidden; }
+  .type-tab span:nth-child(2) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .type-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 3px 12px rgba(63,140,43,.3); }
-  .tab-badge { background:var(--muted); color:var(--text-muted); border-radius:10px; padding:1px 6px; font-size:11px; font-weight:700; }
+  .tab-badge { background:var(--muted); color:var(--text-muted); border-radius:10px; padding:1px 6px; font-size:11px; font-weight:700; flex-shrink:0; }
   .type-tab.active .tab-badge { background:rgba(255,255,255,.25); color:#fff; }
+  .tab-add { border-style:dashed; border-color:var(--accent); background:transparent; color:var(--accent); font-size:15px; font-weight:700; padding:9px 16px; }
 
   /* Main */
   #main { padding:16px 16px 20px; max-width:700px; margin:0 auto; width:100%; }
@@ -170,6 +172,12 @@
   .btn-modal-ok { flex:1; background:var(--accent); color:white; border:none; border-radius:10px; padding:12px; font-weight:700; font-size:15px; }
   .btn-modal-cancel { background:var(--muted); color:var(--text); border:none; border-radius:10px; padding:12px 18px; font-weight:600; font-size:15px; }
   .btn-close-modal { width:100%; background:var(--muted); color:var(--text); border:none; border-radius:12px; padding:13px; font-weight:600; font-size:15px; margin-top:10px; }
+
+  /* Type picker (new list modal) */
+  .type-pick { display:flex; gap:8px; margin-bottom:16px; }
+  .type-pick-btn { flex:1; display:flex; flex-direction:column; align-items:center; gap:4px; padding:10px 6px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface2); font-size:11px; font-weight:700; color:var(--text-muted); }
+  .type-pick-btn span:first-child { font-size:20px; }
+  .type-pick-btn.active { border-color:var(--accent); background:var(--accent); color:#fff; }
 
   /* Share */
   .code-display { background:var(--surface2); border-radius:14px; padding:16px; text-align:center; margin-bottom:18px; border:1.5px solid var(--border); }
@@ -275,7 +283,7 @@
 <div id="landing" class="page active">
   <div class="landing-icon">🛒</div>
   <div class="landing-title">FreshList</div>
-  <div class="landing-sub">One shared, live list — for groceries, trips, to-dos & more</div>
+  <div class="landing-sub">One shared, live code — with as many lists as you need</div>
   <div class="landing-types">
     <div class="landing-type-pill">🛒 Grocery</div>
     <div class="landing-type-pill">🧳 Travel</div>
@@ -317,7 +325,8 @@
         <button class="btn-menu" onclick="toggleMenu()">⋯</button>
         <div class="menu-dropdown" id="menuDropdown">
           <button class="menu-item" onclick="openShare();closeMenu()">🔗 Share list</button>
-          <button class="menu-item" onclick="switchList();closeMenu()">🚪 Switch / new list</button>
+          <button class="menu-item" onclick="openRenameList();closeMenu()">✏️ Rename this list</button>
+          <button class="menu-item" onclick="switchList();closeMenu()">🚪 Switch / new code</button>
           <div class="menu-divider"></div>
           <button class="menu-item" onclick="openTemplates();closeMenu()">
             📋 Templates <span class="chip" id="tplCount" style="display:none"></span>
@@ -360,6 +369,33 @@
   </div>
 </div>
 
+<div class="modal-overlay" id="newListModal" onclick="if(event.target===this)closeNewList()">
+  <div class="modal-box">
+    <div class="modal-title">➕ New List</div>
+    <div class="modal-sub">Name it, pick a type, and it'll show up as a new tab — shared with everyone on this code</div>
+    <input class="modal-input" id="newListName" placeholder="e.g. Italy Trip, Work Tasks..."
+      onkeydown="if(event.key==='Enter')createNewBoard()">
+    <div class="type-pick" id="typePickWrap"></div>
+    <div class="modal-row">
+      <button class="btn-modal-ok" onclick="createNewBoard()">Create</button>
+      <button class="btn-modal-cancel" onclick="closeNewList()">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<div class="modal-overlay" id="renameListModal" onclick="if(event.target===this)closeRenameList()">
+  <div class="modal-box">
+    <div class="modal-title">✏️ Rename List</div>
+    <div class="modal-sub">This updates the tab name for everyone on this code</div>
+    <input class="modal-input" id="renameListInput" placeholder="List name"
+      onkeydown="if(event.key==='Enter')saveRenameList()">
+    <div class="modal-row">
+      <button class="btn-modal-ok" onclick="saveRenameList()">Save</button>
+      <button class="btn-modal-cancel" onclick="closeRenameList()">Cancel</button>
+    </div>
+  </div>
+</div>
+
 <div class="modal-overlay" id="saveTplModal" onclick="if(event.target===this)closeSaveTemplate()">
   <div class="modal-box">
     <div class="modal-title">💾 Save Template</div>
@@ -384,7 +420,7 @@
 <div class="modal-overlay bottom" id="shareModal" onclick="if(event.target===this)closeShare()">
   <div class="modal-box sheet">
     <div class="modal-title">🔗 Share List</div>
-    <div class="modal-sub">Share this code — family joins and edits live. All list types (Grocery, Travel, To-Do, Custom) are included.</div>
+    <div class="modal-sub">Share this code — family joins and edits live. Every list on this code (Grocery, Travel, To-Do, Custom, and any you've added) comes with it.</div>
     <div class="code-display">
       <div class="code-text" id="shareCode"></div>
       <div class="code-hint">Enter this code at the home screen</div>
@@ -412,8 +448,8 @@ firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
 
 // --- 2. LIST TYPE CONFIG ---
-// Every shareable code holds ALL of these list types at once, under
-// lists/{listId}/{type}/items — the tabs just switch which one you're viewing.
+// "type" controls behavior (icon, categories, quantities, AI prompt).
+// The display name of each list ("board") is separate and user-editable.
 const LIST_TYPES = {
   grocery: {
     label: 'Grocery', icon: '🛒',
@@ -453,18 +489,25 @@ const LIST_TYPES = {
   }
 };
 const TYPE_KEYS = Object.keys(LIST_TYPES);
+const DEFAULT_BOARD_ORDER = ['grocery','travel','todo','custom'];
 
 // --- 3. STATE ---
 let listId = null;
-let currentType = localStorage.getItem('fl-type') || 'grocery';
-if (!LIST_TYPES[currentType]) currentType = 'grocery';
-let itemsByType = { grocery:{}, travel:{}, todo:{}, custom:{} };
+let boards = {};            // boardId -> {name, type, order, createdAt}
+let itemsByBoard = {};      // boardId -> items object
+let boardItemUnsubs = {};   // boardId -> off() fn
+let boardsRef = null, boardsHandler = null;
+let currentBoardId = localStorage.getItem('fl-board') || null;
+let seedingInProgress = false;
+let newListType = 'grocery';
 let dbUnsub = null;
 let templates = JSON.parse(localStorage.getItem('fl-tpl') || '[]');
 let dark = localStorage.getItem('fl-dark') === 'true';
 
-function curItems() { return itemsByType[currentType]; }
-function curCfg() { return LIST_TYPES[currentType]; }
+function curBoard() { return boards[currentBoardId]; }
+function curCfg() { const b = curBoard(); return b ? (LIST_TYPES[b.type] || LIST_TYPES.custom) : LIST_TYPES.custom; }
+function curItems() { return itemsByBoard[currentBoardId] || {}; }
+function boardOrderIds() { return Object.keys(boards).sort((a,b) => (boards[a].order||0) - (boards[b].order||0)); }
 
 // --- 4. LIFECYCLE ---
 window.addEventListener('load', () => {
@@ -473,7 +516,6 @@ window.addEventListener('load', () => {
   const codeFromUrl = urlParams.get('list');
   const lastUsed = localStorage.getItem('fl-last-list');
 
-  // Persistence Logic: URL first, then localStorage
   if (codeFromUrl) {
     enterList(codeFromUrl.toUpperCase());
   } else if (lastUsed) {
@@ -505,7 +547,6 @@ function joinList() {
 
 function enterList(id) {
   listId = id;
-  // Save to persistence
   localStorage.setItem('fl-last-list', id);
 
   const url = new URL(window.location);
@@ -514,8 +555,6 @@ function enterList(id) {
   document.getElementById('listCode').textContent = id;
   document.getElementById('shareCode').textContent = id;
   showPage('app');
-  updateInputUI();
-  renderTabs();
   subscribeToList();
   updateTplCount();
 }
@@ -523,7 +562,9 @@ function enterList(id) {
 function switchList() {
   if (dbUnsub) { dbUnsub(); dbUnsub = null; }
   listId = null;
-  itemsByType = { grocery:{}, travel:{}, todo:{}, custom:{} };
+  boards = {};
+  itemsByBoard = {};
+  boardItemUnsubs = {};
   localStorage.removeItem('fl-last-list');
   window.history.replaceState({}, '', window.location.pathname);
   document.getElementById('joinInput').value = '';
@@ -531,38 +572,97 @@ function switchList() {
   showPage('landing');
 }
 
+// --- 5. BOARDS (the lists living inside one shareable code) ---
+async function seedDefaultBoards() {
+  const updates = {};
+  DEFAULT_BOARD_ORDER.forEach((key, i) => {
+    updates[key] = { name: LIST_TYPES[key].label, type: key, order: i, createdAt: Date.now() };
+  });
+  await db.ref(`lists/${listId}/boards`).set(updates);
+  // Best-effort migration from the pre-"boards" data model (lists/{code}/{type}/items)
+  for (const key of DEFAULT_BOARD_ORDER) {
+    try {
+      const legacySnap = await db.ref(`lists/${listId}/${key}/items`).once('value');
+      const legacyItems = legacySnap.val();
+      if (legacyItems) await db.ref(`lists/${listId}/boards/${key}/items`).set(legacyItems);
+    } catch (e) { /* ignore — nothing to migrate */ }
+  }
+}
+
 function subscribeToList() {
-  const offFns = [];
-  TYPE_KEYS.forEach(type => {
-    const r = db.ref(`lists/${listId}/${type}/items`);
+  boardsRef = db.ref(`lists/${listId}/boards`);
+  boardsHandler = async snap => {
+    document.getElementById('statusDot').classList.add('online');
+    const val = snap.val();
+    if (!val) {
+      if (!seedingInProgress) {
+        seedingInProgress = true;
+        await seedDefaultBoards();
+        seedingInProgress = false;
+      }
+      return; // seeding triggers this handler again
+    }
+    boards = val;
+    const ids = boardOrderIds();
+    if (!currentBoardId || !boards[currentBoardId]) {
+      currentBoardId = ids[0];
+      localStorage.setItem('fl-board', currentBoardId);
+    }
+    syncItemSubscriptions(ids);
+    updateInputUI();
+    renderTabs();
+    renderList();
+  };
+  boardsRef.on('value', boardsHandler);
+
+  dbUnsub = () => {
+    if (boardsRef && boardsHandler) boardsRef.off('value', boardsHandler);
+    Object.values(boardItemUnsubs).forEach(f => f());
+    boardItemUnsubs = {};
+  };
+}
+
+function syncItemSubscriptions(ids) {
+  ids.forEach(id => {
+    if (boardItemUnsubs[id]) return;
+    const r = db.ref(`lists/${listId}/boards/${id}/items`);
     const handler = snap => {
-      document.getElementById('statusDot').classList.add('online');
-      itemsByType[type] = snap.val() || {};
+      itemsByBoard[id] = snap.val() || {};
       renderTabs();
-      if (type === currentType) renderList();
+      if (id === currentBoardId) renderList();
     };
     r.on('value', handler);
-    offFns.push(() => r.off('value', handler));
+    boardItemUnsubs[id] = () => r.off('value', handler);
   });
-  dbUnsub = () => offFns.forEach(f => f());
+  Object.keys(boardItemUnsubs).forEach(id => {
+    if (!ids.includes(id)) {
+      boardItemUnsubs[id]();
+      delete boardItemUnsubs[id];
+      delete itemsByBoard[id];
+    }
+  });
 }
 
-// --- 5. TABS ---
+// --- 6. TABS ---
 function renderTabs() {
   const wrap = document.getElementById('typeTabs');
-  wrap.innerHTML = TYPE_KEYS.map(key => {
-    const cfg = LIST_TYPES[key];
-    const count = Object.keys(itemsByType[key] || {}).length;
-    return `<button class="type-tab${key === currentType ? ' active' : ''}" onclick="selectType('${key}')">
-      <span>${cfg.icon}</span><span>${cfg.label}</span>${count ? `<span class="tab-badge">${count}</span>` : ''}
+  const ids = boardOrderIds();
+  let html = ids.map(id => {
+    const b = boards[id];
+    const cfg = LIST_TYPES[b.type] || LIST_TYPES.custom;
+    const count = Object.keys(itemsByBoard[id] || {}).length;
+    return `<button class="type-tab${id === currentBoardId ? ' active' : ''}" onclick="selectBoard('${id}')">
+      <span>${cfg.icon}</span><span>${escapeHTML(b.name)}</span>${count ? `<span class="tab-badge">${count}</span>` : ''}
     </button>`;
   }).join('');
+  html += `<button class="type-tab tab-add" onclick="openNewList()">➕</button>`;
+  wrap.innerHTML = html;
 }
 
-function selectType(type) {
-  if (type === currentType || !LIST_TYPES[type]) return;
-  currentType = type;
-  localStorage.setItem('fl-type', type);
+function selectBoard(id) {
+  if (id === currentBoardId || !boards[id]) return;
+  currentBoardId = id;
+  localStorage.setItem('fl-board', id);
   document.getElementById('itemInput').value = '';
   document.getElementById('errorMsg').style.display = 'none';
   updateInputUI();
@@ -581,10 +681,58 @@ function updateInputUI() {
   document.getElementById('emptySub').textContent = cfg.emptySub;
 }
 
-// --- 6. ACTIONS ---
+// --- 7. NEW LIST / RENAME ---
+function openNewList() {
+  newListType = 'grocery';
+  document.getElementById('newListName').value = '';
+  renderTypePicker();
+  document.getElementById('newListModal').classList.add('open');
+  setTimeout(() => document.getElementById('newListName').focus(), 50);
+}
+function closeNewList() { document.getElementById('newListModal').classList.remove('open'); }
+function renderTypePicker() {
+  document.getElementById('typePickWrap').innerHTML = TYPE_KEYS.map(k => {
+    const cfg = LIST_TYPES[k];
+    return `<button type="button" class="type-pick-btn${k===newListType?' active':''}" onclick="pickNewListType('${k}')">
+      <span>${cfg.icon}</span><span>${cfg.label}</span>
+    </button>`;
+  }).join('');
+}
+function pickNewListType(k) { newListType = k; renderTypePicker(); }
+async function createNewBoard() {
+  const name = document.getElementById('newListName').value.trim();
+  if (!name) return;
+  const ids = boardOrderIds();
+  const nextOrder = ids.length ? Math.max(...ids.map(id => boards[id].order || 0)) + 1 : 0;
+  const newId = db.ref(`lists/${listId}/boards`).push().key;
+  await db.ref(`lists/${listId}/boards/${newId}`).set({
+    name, type: newListType, order: nextOrder, createdAt: Date.now()
+  });
+  currentBoardId = newId;
+  localStorage.setItem('fl-board', newId);
+  closeNewList();
+}
+
+function openRenameList() {
+  const b = curBoard();
+  if (!b) return;
+  document.getElementById('renameListInput').value = b.name;
+  document.getElementById('renameListModal').classList.add('open');
+  setTimeout(() => document.getElementById('renameListInput').select(), 50);
+}
+function closeRenameList() { document.getElementById('renameListModal').classList.remove('open'); }
+async function saveRenameList() {
+  const name = document.getElementById('renameListInput').value.trim();
+  if (!name || !currentBoardId) return;
+  await db.ref(`lists/${listId}/boards/${currentBoardId}`).update({ name });
+  closeRenameList();
+}
+
+// --- 8. ITEM ACTIONS ---
 function fallbackCategory() {
   const cfg = curCfg();
-  if (currentType === 'todo') return 'Medium Priority';
+  const b = curBoard();
+  if (b && b.type === 'todo') return 'Medium Priority';
   if (cfg.cats.includes('Other')) return 'Other';
   if (cfg.cats.length === 0) return 'General';
   return cfg.cats[0];
@@ -596,8 +744,9 @@ async function addItems() {
   const err = document.getElementById('errorMsg');
   const rawValue = input.value.trim();
   const cfg = curCfg();
+  const board = curBoard();
 
-  if (!rawValue || btn.disabled) return;
+  if (!rawValue || btn.disabled || !board) return;
 
   btn.disabled = true;
   btn.textContent = '⏳ Categorizing...';
@@ -607,19 +756,18 @@ async function addItems() {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: rawValue, type: currentType })
+      body: JSON.stringify({ text: rawValue, type: board.type })
     });
 
     if (!response.ok) throw new Error("API Offline");
 
     const rawData = await response.json();
-    // Worker always returns { items: [...] } — no need to handle raw Groq shape anymore
     const itemList = rawData.items || [];
 
     if (itemList.length === 0) throw new Error("No items parsed");
 
     for (const item of itemList) {
-      await db.ref(`lists/${listId}/${currentType}/items`).push({
+      await db.ref(`lists/${listId}/boards/${currentBoardId}/items`).push({
         name: item.name || "Unknown Item",
         quantity: item.quantity || 1,
         unit: item.unit || "",
@@ -633,10 +781,9 @@ async function addItems() {
     input.focus();
   } catch (e) {
     console.error("AI Parse Error, using Fallback:", e);
-    // FALLBACK: Manual split and add
     const splitItems = rawValue.split(',').map(s => s.trim()).filter(s => s.length > 0);
     for (const name of splitItems) {
-        await db.ref(`lists/${listId}/${currentType}/items`).push({
+        await db.ref(`lists/${listId}/boards/${currentBoardId}/items`).push({
             name: name,
             quantity: 1,
             unit: "",
@@ -656,8 +803,9 @@ async function addItems() {
   }
 }
 
-// --- 7. RENDERING ---
+// --- 9. RENDERING ---
 function renderList() {
+  if (!curBoard()) return;
   const cfg = curCfg();
   const items = curItems();
   const arr = Object.entries(items).map(([id, v]) => ({...v, id}));
@@ -690,7 +838,6 @@ function renderList() {
       </div>`;
     });
 
-    // Items whose category didn't match any known bucket
     const uncategorized = unchecked.filter(i => !cfg.cats.includes(i.category));
     if (uncategorized.length) {
       html += `<div class="cat-card">
@@ -704,7 +851,6 @@ function renderList() {
       </div>`;
     }
   } else if (unchecked.length) {
-    // Flat checklist — no categories (e.g. Custom lists)
     html += `<div class="cat-card">
       ${unchecked.map(i => itemHTML(i, cfg)).join('')}
     </div>`;
@@ -756,12 +902,13 @@ function itemHTML(item, cfg) {
   </div>`;
 }
 
-function toggleItem(id) { db.ref(`lists/${listId}/${currentType}/items/${id}`).update({ checked: !curItems()[id]?.checked }); }
-function deleteItem(id) { db.ref(`lists/${listId}/${currentType}/items/${id}`).remove(); }
-function updateQty(id, qty) { db.ref(`lists/${listId}/${currentType}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
+function toggleItem(id) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).update({ checked: !curItems()[id]?.checked }); }
+function deleteItem(id) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).remove(); }
+function updateQty(id, qty) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
 function clearList() {
-  const cfg = curCfg();
-  if (confirm(`Clear the entire ${cfg.label} list?`)) db.ref(`lists/${listId}/${currentType}/items`).remove();
+  const b = curBoard();
+  if (!b) return;
+  if (confirm(`Clear the entire "${b.name}" list?`)) db.ref(`lists/${listId}/boards/${currentBoardId}/items`).remove();
 }
 
 function adj(id, d) {
@@ -804,22 +951,20 @@ function attachSwipe(cfg) {
       cx = e.touches[0].clientX - sx;
       cy = e.touches[0].clientY - sy;
 
-      // Swipe UX Fix: If moving horizontally more than vertically, prevent scroll
       if (Math.abs(cx) > Math.abs(cy)) {
           if (e.cancelable) e.preventDefault();
       } else {
-          // If they are clearly scrolling vertically, stop the horizontal logic
           return;
       }
 
       const cl = Math.max(-80, Math.min(80, cx));
       row.style.transform = `translateX(${cl}px)`;
-    }, {passive:false}); // passive:false is required to allow preventDefault
+    }, {passive:false});
 
     row.addEventListener('touchend', () => {
       row.style.transition = 'transform 0.2s ease-out';
       row.style.transform = 'translateX(0)';
-      if (Math.abs(cx) > Math.abs(cy)) { // Only trigger if horizontal movement was dominant
+      if (Math.abs(cx) > Math.abs(cy)) {
           if (cx > THRESH && cfg.hasQty) openQty(id);
           else if (cx < -THRESH) deleteItem(id);
       }
@@ -832,26 +977,24 @@ async function recategorizeOther() {
   const btn = document.getElementById('reCatBtn');
   const icon = document.getElementById('reCatIcon');
   const cfg = curCfg();
+  const board = curBoard();
 
-  // 1. Find all items currently outside the known category buckets, not checked
   const otherItems = Object.entries(curItems())
     .filter(([id, val]) => !cfg.cats.includes(val.category) && !val.checked)
     .map(([id, val]) => ({ id, name: val.name }));
 
   if (otherItems.length === 0) return;
 
-  // 2. UI Loading State
   btn.disabled = true;
   icon.classList.add('spinning');
   icon.textContent = '⏳';
 
   try {
-    // 3. Send items as "name" strings; build a name->id map for reliable matching
     const namesString = otherItems.map(i => i.name).join(', ');
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: namesString, type: currentType })
+      body: JSON.stringify({ text: namesString, type: board.type })
     });
 
     if (!response.ok) throw new Error("Retry failed");
@@ -859,13 +1002,11 @@ async function recategorizeOther() {
     const data = await response.json();
     const newItems = data.items || [];
 
-    // Build a name->id lookup instead of fragile inline find()
     const nameToId = {};
     otherItems.forEach(o => { nameToId[o.name.toLowerCase()] = o.id; });
 
     for (const newItem of newItems) {
       const key = newItem.name.toLowerCase();
-      // Exact match first, then substring fallback
       let matchedId = nameToId[key];
       if (!matchedId) {
         const found = otherItems.find(o =>
@@ -875,7 +1016,7 @@ async function recategorizeOther() {
       }
 
       if (matchedId) {
-        await db.ref(`lists/${listId}/${currentType}/items/${matchedId}`).update({
+        await db.ref(`lists/${listId}/boards/${currentBoardId}/items/${matchedId}`).update({
           category: newItem.category,
           emoji: newItem.emoji,
           name: newItem.name
@@ -901,7 +1042,7 @@ function toggleDark() { dark = !dark; localStorage.setItem('fl-dark', dark); app
 function toggleMenu() { document.getElementById('menuDropdown').classList.toggle('open'); }
 function closeMenu() { document.getElementById('menuDropdown').classList.remove('open'); }
 
-// --- 8. TEMPLATES (each template remembers which list type it belongs to) ---
+// --- 10. TEMPLATES (each remembers which behavior type it was saved as) ---
 function updateTplCount() {
   const el = document.getElementById('tplCount');
   if (!el) return;
@@ -910,18 +1051,21 @@ function updateTplCount() {
 }
 function openSaveTemplate() {
   const cfg = curCfg();
+  const b = curBoard();
+  if (!b) return;
   const count = Object.keys(curItems()).length;
   document.getElementById('saveTplSub').textContent =
-    `Save your current ${cfg.icon} ${cfg.label} list (${count} item${count===1?'':'s'}) to reuse later`;
+    `Save your current ${cfg.icon} "${b.name}" list (${count} item${count===1?'':'s'}) to reuse later`;
   document.getElementById('saveTplModal').classList.add('open');
 }
 function closeSaveTemplate() { document.getElementById('saveTplModal').classList.remove('open'); }
 function saveTemplate() {
   const name = document.getElementById('tplNameInput').value.trim();
-  if (!name) return;
+  const b = curBoard();
+  if (!name || !b) return;
   templates.push({
     name,
-    type: currentType,
+    type: b.type,
     items: Object.values(curItems()).map(v => ({...v, checked:false})),
     date: Date.now()
   });
@@ -934,7 +1078,7 @@ function openTemplates() {
   const c = document.getElementById('tplListContent');
   c.innerHTML = templates.length
     ? templates.map((t,i) => {
-        const tCfg = LIST_TYPES[t.type] || LIST_TYPES.grocery;
+        const tCfg = LIST_TYPES[t.type] || LIST_TYPES.custom;
         return `
       <div class="tpl-item">
         <div style="flex:1">
@@ -951,15 +1095,11 @@ function openTemplates() {
 function closeTemplates() { document.getElementById('tplListModal').classList.remove('open'); }
 async function loadTemplate(i) {
   const t = templates[i];
-  const type = LIST_TYPES[t.type] ? t.type : 'grocery';
-  await db.ref(`lists/${listId}/${type}/items`).remove();
+  if (!currentBoardId) return;
+  await db.ref(`lists/${listId}/boards/${currentBoardId}/items`).remove();
   for (const item of t.items) {
-      await db.ref(`lists/${listId}/${type}/items`).push({...item});
+      await db.ref(`lists/${listId}/boards/${currentBoardId}/items`).push({...item});
   }
-  currentType = type;
-  localStorage.setItem('fl-type', type);
-  updateInputUI();
-  renderTabs();
   closeTemplates();
 }
 function delTemplate(i) {
