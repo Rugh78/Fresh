@@ -95,7 +95,7 @@
   /* Type tabs */
   .type-tabs { display:flex; gap:8px; padding:14px 16px 0; max-width:700px; margin:0 auto; width:100%; overflow-x:auto; scrollbar-width:none; }
   .type-tabs::-webkit-scrollbar { display:none; }
-  .type-tab { flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text-muted); font-weight:700; font-size:13px; white-space:nowrap; transition:all .15s; max-width:180px; overflow:hidden; }
+  .type-tab { position:relative; flex-shrink:0; display:flex; align-items:center; gap:6px; padding:9px 14px; border-radius:12px; border:1.5px solid var(--border); background:var(--surface); color:var(--text-muted); font-weight:700; font-size:13px; white-space:nowrap; transition:all .15s; max-width:180px; overflow:hidden; }
   .type-tab span:nth-child(2) { overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
   .type-tab.active { background:var(--accent); color:#fff; border-color:var(--accent); box-shadow:0 3px 12px rgba(63,140,43,.3); }
   .tab-badge { background:var(--muted); color:var(--text-muted); border-radius:10px; padding:1px 6px; font-size:11px; font-weight:700; flex-shrink:0; }
@@ -143,18 +143,25 @@
   .item-checkbox { width:22px; height:22px; border-radius:50%; flex-shrink:0; border:2px solid var(--accent); background:transparent; display:flex; align-items:center; justify-content:center; color:white; font-size:12px; transition:all .2s; }
   .item-checkbox.checked { background:var(--accent); }
   .item-emoji { font-size:20px; flex-shrink:0; }
-  .item-name { flex:1; min-width:0; font-size:15px; color:var(--text); overflow-wrap:break-word; line-height:1.4; }
+  .item-text { flex:1; min-width:0; display:flex; flex-direction:column; gap:2px; }
+  .item-name { font-size:15px; color:var(--text); overflow-wrap:break-word; line-height:1.4; }
   .item-name.checked { text-decoration:line-through; }
   .item-qty { font-weight:700; color:var(--accent); margin-right:3px; }
+  .item-note { font-size:12px; color:var(--text-muted); font-style:italic; overflow-wrap:break-word; line-height:1.3; }
+  .due-badge { flex-shrink:0; font-size:11px; font-weight:700; padding:2px 8px; border-radius:8px; background:var(--muted); color:var(--text-muted); white-space:nowrap; }
+  .due-badge.due-today { background:var(--accent); color:#fff; }
+  .due-badge.overdue { background:#fee2e2; color:#e05555; }
   .swipe-hint { position:absolute; bottom:3px; right:8px; font-size:9px; color:var(--text-muted); opacity:.35; font-weight:600; letter-spacing:.03em; pointer-events:none; }
 
-  /* Qty panel */
-  .qty-panel { background:var(--surface2); border:1.5px solid var(--accent); border-top:1px solid var(--border); border-radius:0 0 12px 12px; padding:10px 14px; display:none; align-items:center; gap:10px; flex-wrap:wrap; }
+  /* Edit panel (qty + optional note) */
+  .edit-panel { background:var(--surface2); border:1.5px solid var(--accent); border-top:1px solid var(--border); border-radius:0 0 12px 12px; padding:10px 14px; display:none; flex-direction:column; gap:10px; }
+  .qty-row, .note-row { display:flex; align-items:center; gap:10px; flex-wrap:wrap; }
   .qty-label { font-size:13px; font-weight:700; color:var(--text-muted); flex-shrink:0; }
   .qty-controls { display:flex; align-items:center; gap:8px; }
   .qty-btn { width:30px; height:30px; border-radius:7px; border:1.5px solid var(--border); background:var(--item-bg); color:var(--text); font-size:18px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
   .qty-input { width:50px; text-align:center; background:var(--input-bg); border:1.5px solid var(--border); border-radius:8px; padding:5px; color:var(--text); font-size:15px; font-family:'DM Sans',sans-serif; font-weight:700; }
-  .qty-actions { display:flex; gap:8px; flex:1; justify-content:flex-end; }
+  .note-input { flex:1; min-width:120px; background:var(--input-bg); border:1.5px solid var(--border); border-radius:8px; padding:7px 10px; color:var(--text); font-size:13px; font-family:'DM Sans',sans-serif; }
+  .qty-actions { display:flex; gap:8px; justify-content:flex-end; }
   .btn-save { background:var(--accent); color:white; border:none; border-radius:8px; padding:7px 16px; font-weight:700; font-size:13px; }
   .btn-cancel { background:var(--muted); color:var(--text); border:none; border-radius:8px; padding:7px 12px; font-weight:600; font-size:13px; }
 
@@ -474,6 +481,7 @@ const LIST_TYPES = {
     label: 'To-Do', icon: '✅',
     cats: ["High Priority","Medium Priority","Low Priority"],
     hasQty: false,
+    hasDueDates: true,
     inputLabel: 'ADD TASKS — separate with commas',
     placeholder: '"call dentist, finish report..."',
     addBtnLabel: '+ Add Tasks',
@@ -644,7 +652,10 @@ function syncItemSubscriptions(ids) {
   });
 }
 
-// --- 6. TABS ---
+// --- 6. TABS (with drag-to-reorder) ---
+let tabDrag = null;
+let lastTabDragEnd = 0;
+
 function renderTabs() {
   const wrap = document.getElementById('typeTabs');
   const ids = boardOrderIds();
@@ -652,15 +663,74 @@ function renderTabs() {
     const b = boards[id];
     const cfg = LIST_TYPES[b.type] || LIST_TYPES.custom;
     const count = Object.keys(itemsByBoard[id] || {}).length;
-    return `<button class="type-tab${id === currentBoardId ? ' active' : ''}" onclick="selectBoard('${id}')">
+    return `<button class="type-tab${id === currentBoardId ? ' active' : ''}" data-id="${id}" onclick="selectBoard('${id}')">
       <span>${cfg.icon}</span><span>${escapeHTML(b.name)}</span>${count ? `<span class="tab-badge">${count}</span>` : ''}
     </button>`;
   }).join('');
   html += `<button class="type-tab tab-add" onclick="openNewList()">➕</button>`;
   wrap.innerHTML = html;
+  attachTabDrag();
+}
+
+function attachTabDrag() {
+  const wrap = document.getElementById('typeTabs');
+  const tabs = Array.from(wrap.querySelectorAll('.type-tab[data-id]'));
+  tabs.forEach(el => {
+    el.addEventListener('pointerdown', e => {
+      if (e.pointerType === 'mouse' && e.button !== 0) return;
+      el.style.touchAction = 'none';
+      tabDrag = { id: el.dataset.id, el, startX: e.clientX, dragging: false, others: tabs.filter(t => t !== el) };
+      try { el.setPointerCapture(e.pointerId); } catch (err) {}
+    });
+    el.addEventListener('pointermove', e => {
+      if (!tabDrag || tabDrag.el !== el) return;
+      const dx = e.clientX - tabDrag.startX;
+      if (!tabDrag.dragging && Math.abs(dx) > 8) {
+        tabDrag.dragging = true;
+        el.style.transition = 'none';
+        el.style.zIndex = 50;
+        el.style.boxShadow = '0 6px 18px rgba(0,0,0,.3)';
+      }
+      if (tabDrag.dragging) {
+        e.preventDefault();
+        el.style.transform = `translateX(${dx}px)`;
+      }
+    });
+    el.addEventListener('pointerup', e => finishTabDrag(e, el));
+    el.addEventListener('pointercancel', e => finishTabDrag(e, el));
+  });
+}
+
+function finishTabDrag(e, el) {
+  el.style.touchAction = '';
+  if (!tabDrag || tabDrag.el !== el) { tabDrag = null; return; }
+  const wasDragging = tabDrag.dragging;
+  if (wasDragging) {
+    const pointerX = e.clientX;
+    const others = tabDrag.others;
+    let targetIndex = others.length;
+    for (let i = 0; i < others.length; i++) {
+      const r = others[i].getBoundingClientRect();
+      const center = r.left + r.width / 2;
+      if (pointerX < center) { targetIndex = i; break; }
+    }
+    const draggedId = tabDrag.id;
+    const newOrder = boardOrderIds().filter(id => id !== draggedId);
+    newOrder.splice(targetIndex, 0, draggedId);
+    const updates = {};
+    newOrder.forEach((id, i) => { updates[`${id}/order`] = i; });
+    db.ref(`lists/${listId}/boards`).update(updates);
+    el.style.transform = '';
+    el.style.boxShadow = '';
+    el.style.zIndex = '';
+    el.style.transition = '';
+    lastTabDragEnd = Date.now();
+  }
+  tabDrag = null;
 }
 
 function selectBoard(id) {
+  if (Date.now() - lastTabDragEnd < 250) return;
   if (id === currentBoardId || !boards[id]) return;
   currentBoardId = id;
   localStorage.setItem('fl-board', id);
@@ -774,6 +844,7 @@ async function addItems() {
         unit: item.unit || "",
         category: item.category || fallbackCategory(),
         emoji: item.emoji || "📦",
+        dueDate: item.dueDate || "",
         checked: false,
         addedAt: Date.now()
       });
@@ -868,6 +939,17 @@ function renderList() {
   attachSwipe(cfg);
 }
 
+function formatDueBadge(dateStr) {
+  const d = new Date(dateStr + 'T00:00:00');
+  if (isNaN(d.getTime())) return '';
+  const today = new Date(); today.setHours(0,0,0,0);
+  const diffDays = Math.round((d - today) / 86400000);
+  const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+  let cls = 'due-badge';
+  if (diffDays < 0) cls += ' overdue';
+  else if (diffDays === 0) cls += ' due-today';
+  return `<span class="${cls}">📅 ${label}</span>`;
+}
 function escapeHTML(str) {
   return String(str)
     .replace(/&/g, '&amp;')
@@ -878,34 +960,45 @@ function escapeHTML(str) {
 }
 function itemHTML(item, cfg) {
   const qtyLabel = (cfg.hasQty && item.quantity > 1) ? `<span class="item-qty">${item.quantity}${item.unit?' '+item.unit:''}×</span>` : '';
-  const hint = cfg.hasQty ? '← del · edit →' : '← delete';
-  const qtyPanel = cfg.hasQty ? `<div class="qty-panel" id="qp-${item.id}">
-      <span class="qty-label">Qty</span>
-      <div class="qty-controls">
-        <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',-1)">−</button>
-        <input class="qty-input" id="qi-${item.id}" value="${item.quantity}" type="number" min="1"
-          onkeydown="if(event.key==='Enter')saveQty('${item.id}')">
-        <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',1)">+</button>
-      </div>
-      <div class="qty-actions">
-        <button class="btn-save" onclick="event.stopPropagation();saveQty('${item.id}')">✓ Save</button>
-        <button class="btn-cancel" onclick="event.stopPropagation();closeQty('${item.id}')">Cancel</button>
-      </div>
-    </div>` : '';
+  const noteLine = item.note ? `<div class="item-note">${escapeHTML(item.note)}</div>` : '';
+  const dueBadge = (cfg.hasDueDates && item.dueDate) ? formatDueBadge(item.dueDate) : '';
+  const qtyRow = cfg.hasQty ? `<div class="qty-row">
+        <span class="qty-label">Qty</span>
+        <div class="qty-controls">
+          <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',-1)">−</button>
+          <input class="qty-input" id="qi-${item.id}" value="${item.quantity}" type="number" min="1"
+            onkeydown="if(event.key==='Enter')saveEdit('${item.id}')">
+          <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',1)">+</button>
+        </div>
+      </div>` : '';
   return `<div class="item-wrap" id="wrap-${item.id}">
     <div class="item-row${item.checked?' checked':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
       <div class="item-checkbox${item.checked?' checked':''}">${item.checked?'✓':''}</div>
       <span class="item-emoji">${escapeHTML(item.emoji)}</span>
-      <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(item.name)}</span>
+      <div class="item-text">
+        <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(item.name)}</span>
+        ${noteLine}
+      </div>
+      ${dueBadge}
     </div>
-    <div class="swipe-hint">${hint}</div>
-    ${qtyPanel}
+    <div class="swipe-hint">← delete · edit →</div>
+    <div class="edit-panel" id="ep-${item.id}">
+      ${qtyRow}
+      <div class="note-row">
+        <span class="qty-label">Note</span>
+        <input class="note-input" id="ni-${item.id}" value="${escapeHTML(item.note||'')}" placeholder="optional note..."
+          onkeydown="if(event.key==='Enter')saveEdit('${item.id}')">
+      </div>
+      <div class="qty-actions">
+        <button class="btn-save" onclick="event.stopPropagation();saveEdit('${item.id}')">✓ Save</button>
+        <button class="btn-cancel" onclick="event.stopPropagation();closeEdit('${item.id}')">Cancel</button>
+      </div>
+    </div>
   </div>`;
 }
 
 function toggleItem(id) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).update({ checked: !curItems()[id]?.checked }); }
 function deleteItem(id) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).remove(); }
-function updateQty(id, qty) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).update({ quantity: Math.max(1, parseInt(qty)||1) }); }
 function clearList() {
   const b = curBoard();
   if (!b) return;
@@ -932,19 +1025,26 @@ function adj(id, d) {
   const inp = document.getElementById(`qi-${id}`);
   if (inp) inp.value = Math.max(1, parseInt(inp.value||1)+d);
 }
-function saveQty(id) {
-  const inp = document.getElementById(`qi-${id}`);
-  if (inp) updateQty(id, inp.value);
-  closeQty(id);
+async function saveEdit(id) {
+  const cfg = curCfg();
+  const updates = {};
+  if (cfg.hasQty) {
+    const inp = document.getElementById(`qi-${id}`);
+    if (inp) updates.quantity = Math.max(1, parseInt(inp.value||1)||1);
+  }
+  const noteInp = document.getElementById(`ni-${id}`);
+  if (noteInp) updates.note = noteInp.value.trim();
+  await db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).update(updates);
+  closeEdit(id);
 }
-function openQty(id) {
-  const p = document.getElementById(`qp-${id}`);
+function openEdit(id) {
+  const p = document.getElementById(`ep-${id}`);
   const w = document.getElementById(`wrap-${id}`);
   if (p) p.style.display = 'flex';
   if (w) w.style.borderRadius = '12px 12px 0 0';
 }
-function closeQty(id) {
-  const p = document.getElementById(`qp-${id}`);
+function closeEdit(id) {
+  const p = document.getElementById(`ep-${id}`);
   const w = document.getElementById(`wrap-${id}`);
   if (p) p.style.display = 'none';
   if (w) w.style.borderRadius = '12px';
@@ -982,7 +1082,7 @@ function attachSwipe(cfg) {
       row.style.transition = 'transform 0.2s ease-out';
       row.style.transform = 'translateX(0)';
       if (Math.abs(cx) > Math.abs(cy)) {
-          if (cx > THRESH && cfg.hasQty) openQty(id);
+          if (cx > THRESH) openEdit(id);
           else if (cx < -THRESH) deleteItem(id);
       }
       sx = null; sy = null; cx = 0; cy = 0;
