@@ -333,7 +333,8 @@
           </button>
           <button class="menu-item" onclick="openSaveTemplate();closeMenu()">💾 Save as template</button>
           <div class="menu-divider"></div>
-          <button class="menu-item menu-danger" onclick="clearList();closeMenu()">🗑️ Clear this list</button>
+          <button class="menu-item menu-danger" onclick="clearList();closeMenu()">🧹 Clear this list</button>
+          <button class="menu-item menu-danger" onclick="deleteBoard();closeMenu()">🗑️ Delete this list</button>
         </div>
       </div>
     </div>
@@ -909,6 +910,22 @@ function clearList() {
   const b = curBoard();
   if (!b) return;
   if (confirm(`Clear the entire "${b.name}" list?`)) db.ref(`lists/${listId}/boards/${currentBoardId}/items`).remove();
+}
+
+async function deleteBoard() {
+  const ids = boardOrderIds();
+  const b = curBoard();
+  if (!b) return;
+  if (ids.length <= 1) {
+    alert("You need at least one list — create another before deleting this one.");
+    return;
+  }
+  if (!confirm(`Delete "${b.name}" and all its items? This can't be undone.`)) return;
+  const deletedId = currentBoardId;
+  const remaining = ids.filter(id => id !== deletedId);
+  currentBoardId = remaining[0];
+  localStorage.setItem('fl-board', currentBoardId);
+  await db.ref(`lists/${listId}/boards/${deletedId}`).remove();
 }
 
 function adj(id, d) {
