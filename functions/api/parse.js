@@ -1,41 +1,5 @@
-export async function onRequest(context) {
-  const { request, env } = context;
-
-  if (request.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
-    });
-  }
-
-  try {
-    const body = await request.json();
-
-    // Accept both "text" (sent by frontend) and "userInput" (legacy)
-    const userInput = body.text || body.userInput;
-
-    if (!userInput || userInput.trim() === "") {
-      return new Response(JSON.stringify({ error: "No input provided" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
-    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${env.GROQ_API_KEY}`
-      },
-      body: JSON.stringify({
-        model: "openai/gpt-oss-20b",
-        messages: [
-          {
-            role: "system",
-            content: `You are a grocery list parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
+const SYSTEM_PROMPTS = {
+  grocery: `You are a grocery list parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
 The user gives you grocery items in any language or mix of languages.
 
 Rules:
@@ -68,8 +32,117 @@ Output: {"items": [
   {"name": "Watermelon", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍉"},
   {"name": "Green Apple", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🍏"},
   {"name": "Avocado", "quantity": 1, "unit": "", "category": "Produce", "emoji": "🥑"}
-]}`
-          },
+]}`,
+
+  travel: `You are a travel packing list parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
+The user gives you items to pack for a trip, in any language or mix of languages.
+
+Rules:
+- ALWAYS output the item name in English, regardless of the input language. Translate as needed.
+- If an item is written ONLY as emoji(s), convert it to a clear TEXT name in English. If repeated (e.g., 👕👕👕), set quantity to the count.
+- Choose the correct packing category based on what the item IS.
+- Pick an appropriate emoji for the item.
+- Infer quantity from context (e.g. "3 shirts" → quantity 3, name "Shirt").
+
+Return ONLY a valid JSON object with an 'items' array. No extra text, no markdown, no explanation.
+Each item must have:
+  name (string — in English),
+  quantity (number, default 1),
+  unit (string, can be empty),
+  category (one of: Clothing, Toiletries, Electronics, Documents, Health & Meds, Gear, Other),
+  emoji (single relevant emoji)
+
+Examples:
+Input: "passport, 3 shirts, charger, sunscreen"
+Output: {"items": [{"name": "Passport", "quantity": 1, "unit": "", "category": "Documents", "emoji": "🛂"}, {"name": "Shirt", "quantity": 3, "unit": "", "category": "Clothing", "emoji": "👕"}, {"name": "Charger", "quantity": 1, "unit": "", "category": "Electronics", "emoji": "🔌"}, {"name": "Sunscreen", "quantity": 1, "unit": "", "category": "Toiletries", "emoji": "🧴"}]}
+
+Input: "מטען, מסכת שינה, 2 מכנסיים"
+Output: {"items": [{"name": "Charger", "quantity": 1, "unit": "", "category": "Electronics", "emoji": "🔌"}, {"name": "Sleep Mask", "quantity": 1, "unit": "", "category": "Gear", "emoji": "😴"}, {"name": "Pants", "quantity": 2, "unit": "", "category": "Clothing", "emoji": "👖"}]}`,
+
+  todo: `You are a to-do list parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
+The user gives you tasks in any language or mix of languages.
+
+Rules:
+- ALWAYS output the task name in English, regardless of the input language. Translate as needed. Phrase it as a short, actionable item (e.g. "Call dentist", not "Dentist").
+- Determine priority from urgency cues in the text: words like "urgent", "asap", "today", "important", "!!!" → High Priority. Words like "someday", "eventually", "maybe", "low priority", "whenever" → Low Priority. Otherwise → Medium Priority.
+- quantity is always 1, unit is always empty.
+- Pick an emoji that represents the task itself (e.g. 📞 for calls, 📧 for emails, 🧹 for chores, 💰 for bills).
+
+Return ONLY a valid JSON object with an 'items' array. No extra text, no markdown, no explanation.
+Each item must have:
+  name (string — in English, actionable phrasing),
+  quantity (always 1),
+  unit (always ""),
+  category (one of: High Priority, Medium Priority, Low Priority),
+  emoji (single relevant emoji)
+
+Examples:
+Input: "urgent: call the bank, water plants, maybe clean garage"
+Output: {"items": [{"name": "Call the bank", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "📞"}, {"name": "Water plants", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🪴"}, {"name": "Clean garage", "quantity": 1, "unit": "", "category": "Low Priority", "emoji": "🧹"}]}
+
+Input: "לשלם חשבון חשמל היום, לקבוע תור לרופא"
+Output: {"items": [{"name": "Pay electricity bill", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "💡"}, {"name": "Book doctor's appointment", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🩺"}]}`,
+
+  custom: `You are a generic checklist parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
+The user gives you a free-form list of items to track, in any language or mix of languages.
+
+Rules:
+- ALWAYS output the item name in English, regardless of the input language. Translate as needed.
+- If the same item is repeated (text or emoji), set quantity to the count, otherwise quantity is 1.
+- category is always "General" — do not categorize.
+- Pick a relevant emoji for the item, or 📌 if nothing fits well.
+
+Return ONLY a valid JSON object with an 'items' array. No extra text, no markdown, no explanation.
+Each item must have:
+  name (string — in English),
+  quantity (number, default 1),
+  unit (always ""),
+  category (always "General"),
+  emoji (single relevant emoji)
+
+Example:
+Input: "feed the cat, books to return, books to return"
+Output: {"items": [{"name": "Feed the cat", "quantity": 1, "unit": "", "category": "General", "emoji": "🐈"}, {"name": "Return books", "quantity": 2, "unit": "", "category": "General", "emoji": "📚"}]}`
+};
+
+export async function onRequest(context) {
+  const { request, env } = context;
+
+  if (request.method === "OPTIONS") {
+    return new Response(null, {
+      headers: {
+        "Access-Control-Allow-Origin": "*",
+        "Access-Control-Allow-Methods": "POST, OPTIONS",
+        "Access-Control-Allow-Headers": "Content-Type",
+      },
+    });
+  }
+
+  try {
+    const body = await request.json();
+
+    // Accept both "text" (sent by frontend) and "userInput" (legacy)
+    const userInput = body.text || body.userInput;
+    // Which list type this parse request is for: grocery | travel | todo | custom
+    const listType = SYSTEM_PROMPTS[body.type] ? body.type : "grocery";
+
+    if (!userInput || userInput.trim() === "") {
+      return new Response(JSON.stringify({ error: "No input provided" }), {
+        status: 400,
+        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
+      });
+    }
+
+    const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${env.GROQ_API_KEY}`
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-oss-20b",
+        messages: [
+          { role: "system", content: SYSTEM_PROMPTS[listType] },
           { role: "user", content: userInput }
         ],
         temperature: 0,
