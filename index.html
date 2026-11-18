@@ -296,6 +296,15 @@
 
   @keyframes fadeIn { from{opacity:0;transform:translateY(6px)} to{opacity:1;transform:translateY(0)} }
   @keyframes slideUp { from{transform:translateY(100%)} to{transform:translateY(0)} }
+
+  .voice-input-row,.input-actions { display:flex; gap:8px; align-items:stretch; }
+  .voice-input-row { margin-bottom:10px; }
+  .voice-input-row #itemInput { flex:1; min-width:0; margin-bottom:0; }
+  .icon-action { flex:0 0 46px; border:1px solid var(--border); border-radius:12px; background:var(--input-bg); color:var(--text); font-size:20px; cursor:pointer; }
+  .icon-action:disabled { opacity:.45; cursor:default; }
+  .icon-action.recording { background:#b42318; color:white; }
+  .input-actions .btn-add { flex:1; width:auto; margin:0; }
+  .icon-action:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
 </style>
 </head>
 <body>
@@ -366,9 +375,15 @@
   <div id="main">
     <div class="input-card">
       <div class="input-label" id="inputLabel">ADD ITEMS — separate with commas</div>
-      <input id="itemInput" placeholder='"2 milk, eggs, bread..."'
+      <div class="voice-input-row"><input dir="auto" id="itemInput" placeholder='"2 milk, eggs, bread..."'
         onkeydown="if(event.key==='Enter')addItems()">
+        <button type="button" class="icon-action" id="voiceBtn" onclick="toggleVoice()" aria-label="Record items" title="Speak items in Hebrew, English or Spanish">🎙️</button>
+      </div>
+      <div class="input-actions">
       <button class="btn-add" id="addBtn" onclick="addItems()">+ Add Items</button>
+        <button type="button" class="icon-action clear-action" id="clearBtn" onclick="clearList()" aria-label="Clear current list" title="Clear current list">🗑️</button>
+      </div>
+      <div id="voiceStatus" role="status" aria-live="polite" style="font-size:12px;color:var(--muted);margin-top:8px">Voice: Hebrew · English · Español. Audio is sent to Groq for transcription.</div>
       <div class="error-msg" id="errorMsg"></div>
     </div>
 
@@ -853,6 +868,105 @@ function fallbackCategory() {
   return cfg.cats[0];
 }
 
+
+let voiceRecorder = null;
+let voiceBusy = false;
+function voiceControls(busy) {
+  voiceBusy = busy;
+  document.getElementById('itemInput').disabled = busy;
+  document.getElementById('addBtn').disabled = busy;
+  document.getElementById('clearBtn').disabled = busy;
+}
+async function toggleVoice() {
+  if (voiceRecorder && voiceRecorder.state === 'recording') {
+    voiceRecorder.stop();
+    return;
+  }
+  if (voiceBusy || document.getElementById('addBtn').disabled) return;
+  const button = document.getElementById('voiceBtn');
+  const status = document.getElementById('voiceStatus');
+  if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+    status.textContent = 'Voice recording is unavailable in this browser. Try Chrome or Safari.';
+    return;
+  }
+  const targetList = listId, targetBoard = currentBoardId;
+  if (!targetBoard) return;
+  voiceControls(true);
+  button.disabled = true;
+  let stream, timer;
+  try {
+    stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    if (targetList !== listId || targetBoard !== currentBoardId) {
+      stream.getTracks().forEach(track => track.stop());
+      voiceControls(false);
+      button.disabled = false;
+      return;
+    }
+    const mimeType = ['audio/webm;codecs=opus', 'audio/mp4', 'audio/ogg;codecs=opus']
+      .find(type => MediaRecorder.isTypeSupported(type));
+    const recorder = new MediaRecorder(stream, mimeType ? { mimeType } : {});
+    voiceRecorder = recorder;
+    const chunks = [];
+    let failed = false;
+    recorder.ondataavailable = event => { if (event.data.size) chunks.push(event.data); };
+    recorder.onerror = () => { failed = true; if (recorder.state !== 'inactive') recorder.stop(); };
+    recorder.onstop = async () => {
+      clearTimeout(timer);
+      stream.getTracks().forEach(track => track.stop());
+      voiceRecorder = null;
+      button.classList.remove('recording');
+      button.textContent = '🎙️';
+      button.setAttribute('aria-label', 'Record items');
+      button.disabled = true;
+      try {
+        if (failed) throw new Error('Recording failed. Please try again.');
+        const audio = new Blob(chunks, { type: recorder.mimeType || 'audio/webm' });
+        if (!audio.size) throw new Error('No audio recorded. Please try again.');
+        status.textContent = 'Transcribing your items…';
+        const response = await fetch('/api/transcribe', {
+          method: 'POST', headers: { 'Content-Type': audio.type }, body: audio,
+          signal: AbortSignal.timeout(45000)
+        });
+        const data = await response.json();
+        if (!response.ok) throw new Error(data.error || 'Transcription failed. Please try again.');
+        if (typeof data.text !== 'string' || !data.text.trim() || data.text.length > 1000)
+          throw new Error('No clear speech detected. Please try again.');
+        // Preserve a transcript even if the user navigated while recording.
+        const input = document.getElementById('itemInput');
+        input.value = [input.value.trim(), data.text.trim()].filter(Boolean).join(', ');
+        voiceControls(false);
+        if (targetList !== listId || targetBoard !== currentBoardId) {
+          status.textContent = 'List changed. Review the transcript and tap Add on the correct list.';
+          return;
+        }
+        status.textContent = 'Adding your spoken items…';
+        await addItems();
+        status.textContent = input.value ? 'Transcript kept above. Review it and retry Add.' : 'Spoken items added.';
+      } catch (error) {
+        status.textContent = error.message || 'Voice input failed. Please try again.';
+      } finally {
+        voiceControls(false);
+        button.disabled = false;
+      }
+    };
+    recorder.start();
+    button.disabled = false;
+    button.textContent = '⏹';
+    button.classList.add('recording');
+    button.setAttribute('aria-label', 'Stop recording and add items');
+    status.textContent = 'Listening… speak your items, then tap Stop. Maximum 60 seconds.';
+    timer = setTimeout(() => { if (recorder.state === 'recording') recorder.stop(); }, 60000);
+  } catch (error) {
+    stream?.getTracks().forEach(track => track.stop());
+    voiceRecorder = null;
+    voiceControls(false);
+    button.disabled = false;
+    status.textContent = error.name === 'NotAllowedError'
+      ? 'Microphone access was denied. Allow it in browser settings to use voice.'
+      : 'Could not start the microphone. Please try again.';
+  }
+}
+
 async function addItems() {
   const input = document.getElementById('itemInput');
   const btn = document.getElementById('addBtn');
@@ -860,6 +974,7 @@ async function addItems() {
   const rawValue = input.value.trim();
   const cfg = curCfg();
   const board = curBoard();
+  const targetListId = listId, targetBoardId = currentBoardId;
 
   if (!rawValue || btn.disabled || !board) return;
 
@@ -921,7 +1036,7 @@ async function addItems() {
   }
 
   try {
-    const itemsRef = db.ref(`lists/${listId}/boards/${currentBoardId}/items`);
+    const itemsRef = db.ref(`lists/${targetListId}/boards/${targetBoardId}/items`);
     const updates = {};
     itemList.forEach(item => { updates[itemsRef.push().key] = item; });
     await itemsRef.update(updates);
@@ -1083,7 +1198,7 @@ function toggleItem(id) { db.ref(`lists/${listId}/boards/${currentBoardId}/items
 function deleteItem(id) { db.ref(`lists/${listId}/boards/${currentBoardId}/items/${id}`).remove(); }
 function clearList() {
   const b = curBoard();
-  if (!b) return;
+  if (!b || voiceBusy || document.getElementById('addBtn').disabled) return;
   if (confirm(`Clear the entire "${b.name}" list?`)) db.ref(`lists/${listId}/boards/${currentBoardId}/items`).remove();
 }
 
