@@ -80,12 +80,12 @@ Each item must have:
   emoji (single relevant emoji),
   dueDate (string, "YYYY-MM-DD" or "" if no date was mentioned)
 
-Example (assuming today is Monday, June 16, 2026):
+Example (assuming today is Tuesday, June 16, 2026):
 Input: "urgent: call the bank by Friday, water plants, maybe clean garage"
-Output: {"items": [{"name": "Call the bank", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "📞", "dueDate": "2026-06-20"}, {"name": "Water plants", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🪴", "dueDate": ""}, {"name": "Clean garage", "quantity": 1, "unit": "", "category": "Low Priority", "emoji": "🧹", "dueDate": ""}]}
+Output: {"items": [{"name": "Call the bank", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "📞", "dueDate": "2026-06-19"}, {"name": "Water plants", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🪴", "dueDate": ""}, {"name": "Clean garage", "quantity": 1, "unit": "", "category": "Low Priority", "emoji": "🧹", "dueDate": ""}]}
 
-Input: "לשלם חשבון חשמל היום, לקבוע תור לרופא מחר"
-Output: {"items": [{"name": "Pay electricity bill", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "💡", "dueDate": ""}, {"name": "Book doctor's appointment", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🩺", "dueDate": "<tomorrow's date relative to today>"}]}`,
+Input: "pay the electricity bill today, book a doctor's appointment tomorrow"
+Output: {"items": [{"name": "Pay the electricity bill", "quantity": 1, "unit": "", "category": "High Priority", "emoji": "💡", "dueDate": "2026-06-16"}, {"name": "Book a doctor's appointment", "quantity": 1, "unit": "", "category": "Medium Priority", "emoji": "🩺", "dueDate": "2026-06-17"}]}`,
 
   custom: `You are a generic checklist parser that supports ANY language (Hebrew, Arabic, Spanish, English, etc).
 The user gives you a free-form list of items to track, in any language or mix of languages.
@@ -109,51 +109,118 @@ Input: "feed the cat, books to return, books to return"
 Output: {"items": [{"name": "Feed the cat", "quantity": 1, "unit": "", "category": "General", "emoji": "🐈"}, {"name": "Return books", "quantity": 2, "unit": "", "category": "General", "emoji": "📚"}]}`
 };
 
+function isValidISODate(value) {
+  if (typeof value !== "string" || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
+  const parsed = new Date(value + "T00:00:00Z");
+  return Number.isFinite(parsed.getTime()) && parsed.toISOString().slice(0, 10) === value;
+}
+
+function jsonResponse(payload, status, origin) {
+  const headers = {
+    "Content-Type": "application/json; charset=utf-8",
+    "Cache-Control": "no-store"
+  };
+  if (origin) {
+    headers["Access-Control-Allow-Origin"] = origin;
+    headers["Vary"] = "Origin";
+  }
+  return new Response(JSON.stringify(payload), { status, headers });
+}
+
+const ALLOWED_CATEGORIES = {
+  grocery: ["Produce", "Dairy", "Bakery", "Meat & Seafood", "Frozen", "Pantry", "Beverages", "Snacks", "Household", "Personal Care", "Other"],
+  travel: ["Clothing", "Toiletries", "Electronics", "Documents", "Health & Meds", "Gear", "Other"],
+  todo: ["High Priority", "Medium Priority", "Low Priority"],
+  custom: ["General"]
+};
+const MAX_BODY_BYTES = 10000;
+const MAX_INPUT_LENGTH = 1000;
+const MAX_ITEMS = 50;
+
 export async function onRequest(context) {
   const { request, env } = context;
+  const origin = request.headers.get("Origin");
+  const requestOrigin = new URL(request.url).origin;
+
+  if (origin && origin !== requestOrigin) {
+    return jsonResponse({ error: "Origin not allowed" }, 403);
+  }
 
   if (request.method === "OPTIONS") {
-    return new Response(null, {
-      headers: {
-        "Access-Control-Allow-Origin": "*",
-        "Access-Control-Allow-Methods": "POST, OPTIONS",
-        "Access-Control-Allow-Headers": "Content-Type",
-      },
+    const headers = {
+      "Access-Control-Allow-Methods": "POST, OPTIONS",
+      "Access-Control-Allow-Headers": "Content-Type",
+      "Vary": "Origin"
+    };
+    if (origin) headers["Access-Control-Allow-Origin"] = origin;
+    return new Response(null, { status: 204, headers });
+  }
+
+  if (request.method !== "POST") {
+    return jsonResponse({ error: "Method not allowed" }, 405, origin);
+  }
+  if (((request.headers.get("Content-Type") || "").split(";")[0]).trim().toLowerCase() !== "application/json") {
+    return jsonResponse({ error: "Content-Type must be application/json" }, 415, origin);
+  }
+
+  const declaredLength = Number(request.headers.get("Content-Length") || 0);
+  if (declaredLength > MAX_BODY_BYTES) {
+    return jsonResponse({ error: "Request is too large" }, 413, origin);
+  }
+
+  let body;
+  try {
+    const rawBody = await request.text();
+    if (new TextEncoder().encode(rawBody).byteLength > MAX_BODY_BYTES) {
+      return jsonResponse({ error: "Request is too large" }, 413, origin);
+    }
+    body = JSON.parse(rawBody);
+  } catch {
+    return jsonResponse({ error: "Invalid JSON body" }, 400, origin);
+  }
+  if (!body || typeof body !== "object" || Array.isArray(body)) {
+    return jsonResponse({ error: "Invalid request body" }, 400, origin);
+  }
+
+  const userInput = typeof body.text === "string" ? body.text :
+    (typeof body.userInput === "string" ? body.userInput : "");
+  const text = userInput.trim();
+  if (!text) return jsonResponse({ error: "No input provided" }, 400, origin);
+  if (text.length > MAX_INPUT_LENGTH) {
+    return jsonResponse({ error: "Input is too long (maximum 1000 characters)" }, 413, origin);
+  }
+
+  const listType = body.type === undefined ? "grocery" : body.type;
+  if (!Object.prototype.hasOwnProperty.call(SYSTEM_PROMPTS, listType)) {
+    return jsonResponse({ error: "Unsupported list type" }, 400, origin);
+  }
+  if (!env.GROQ_API_KEY) {
+    console.error("GROQ_API_KEY is not configured");
+    return jsonResponse({ error: "Parser is temporarily unavailable" }, 503, origin);
+  }
+
+  let systemContent = SYSTEM_PROMPTS[listType];
+  if (listType === "todo") {
+    const today = isValidISODate(body.today) ? body.today : new Date().toISOString().slice(0, 10);
+    const todayAtNoonUTC = new Date(today + "T12:00:00Z");
+    const niceDate = todayAtNoonUTC.toLocaleDateString("en-US", {
+      weekday: "long", year: "numeric", month: "long", day: "numeric", timeZone: "UTC"
     });
+    systemContent = systemContent.replace("{{TODAY}}", niceDate);
   }
 
   try {
-    const body = await request.json();
-
-    // Accept both "text" (sent by frontend) and "userInput" (legacy)
-    const userInput = body.text || body.userInput;
-    // Which list type this parse request is for: grocery | travel | todo | custom
-    const listType = SYSTEM_PROMPTS[body.type] ? body.type : "grocery";
-    let systemContent = SYSTEM_PROMPTS[listType];
-    if (listType === "todo") {
-      const today = new Date();
-      const niceDate = today.toLocaleDateString("en-US", { weekday: "long", year: "numeric", month: "long", day: "numeric" });
-      systemContent = systemContent.replace("{{TODAY}}", niceDate);
-    }
-
-    if (!userInput || userInput.trim() === "") {
-      return new Response(JSON.stringify({ error: "No input provided" }), {
-        status: 400,
-        headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-      });
-    }
-
     const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
-        "Authorization": `Bearer ${env.GROQ_API_KEY}`
+        "Authorization": "Bearer " + env.GROQ_API_KEY
       },
       body: JSON.stringify({
         model: "openai/gpt-oss-20b",
         messages: [
           { role: "system", content: systemContent },
-          { role: "user", content: userInput }
+          { role: "user", content: text }
         ],
         temperature: 0,
         response_format: { type: "json_object" }
@@ -161,24 +228,55 @@ export async function onRequest(context) {
     });
 
     if (!response.ok) {
-      const errText = await response.text();
-      throw new Error(`Groq API error ${response.status}: ${errText}`);
+      console.error("Groq API returned status", response.status);
+      return jsonResponse({ error: "Could not parse the items. Please try again." }, 502, origin);
     }
 
     const data = await response.json();
-    const aiResult = JSON.parse(data.choices[0].message.content);
+    const content = data && data.choices && data.choices[0] &&
+      data.choices[0].message && data.choices[0].message.content;
+    if (typeof content !== "string") throw new Error("Invalid model response");
 
-    return new Response(JSON.stringify(aiResult), {
-      headers: {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*"
+    const parsed = JSON.parse(content);
+    if (!parsed || !Array.isArray(parsed.items) ||
+        parsed.items.length === 0 || parsed.items.length > MAX_ITEMS) {
+      throw new Error("Invalid model response");
+    }
+
+    const items = parsed.items.map(item => {
+      if (!item || typeof item !== "object" || Array.isArray(item)) {
+        throw new Error("Invalid model item");
       }
+      const name = typeof item.name === "string" ? item.name.trim() : "";
+      const quantity = item.quantity === undefined ? 1 : item.quantity;
+      const unit = item.unit === undefined ? "" : item.unit;
+      const category = item.category;
+      const emoji = item.emoji;
+
+      if (!name || name.length > 100 ||
+          !Number.isInteger(quantity) || quantity < 1 || quantity > 999 ||
+          typeof unit !== "string" || unit.length > 30 ||
+          !ALLOWED_CATEGORIES[listType].includes(category) ||
+          typeof emoji !== "string" || Array.from(emoji).length > 8) {
+        throw new Error("Invalid model item");
+      }
+
+      const normalized = { name, quantity, unit, category, emoji: emoji || "📦" };
+      if (listType === "todo") {
+        const dueDate = item.dueDate === undefined ? "" : item.dueDate;
+        if (typeof dueDate !== "string" || (dueDate !== "" && !isValidISODate(dueDate))) {
+          throw new Error("Invalid model due date");
+        }
+        normalized.dueDate = dueDate;
+      } else {
+        normalized.dueDate = "";
+      }
+      return normalized;
     });
 
+    return jsonResponse({ items }, 200, origin);
   } catch (error) {
-    return new Response(JSON.stringify({ error: error.message }), {
-      status: 500,
-      headers: { "Content-Type": "application/json", "Access-Control-Allow-Origin": "*" }
-    });
+    console.error("Parser request failed:", error && error.name ? error.name : "Error");
+    return jsonResponse({ error: "Could not parse the items. Please try again." }, 502, origin);
   }
 }

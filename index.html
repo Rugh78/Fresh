@@ -15,6 +15,7 @@
 <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Playfair+Display:wght@700&display=swap" rel="stylesheet">
 
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
 
 <style>
@@ -315,7 +316,7 @@
     <div class="join-box" id="joinBox" style="display:none">
       <div class="join-label">ENTER LIST CODE</div>
       <div class="join-row">
-        <input id="joinInput" placeholder="ABC123" maxlength="8"
+        <input id="joinInput" placeholder="ABC123456789" maxlength="12"
           oninput="this.value=this.value.toUpperCase()"
           onkeydown="if(event.key==='Enter')joinList()">
         <button class="btn-join" onclick="joinList()">Join →</button>
@@ -474,9 +475,11 @@
 <script>
 // --- 1. FIREBASE INITIALIZATION ---
 const firebaseConfig = {
+  apiKey: "AIzaSyD0AIZinI71x3Ka5pPxsQRQxHjtM5XjKyM",
   authDomain: "freshlist-e9665.firebaseapp.com",
   databaseURL: "https://freshlist-e9665-default-rtdb.firebaseio.com",
   projectId: "freshlist-e9665",
+  appId: "1:292817840517:web:64018f67b34b527d35fcec"
 };
 firebase.initializeApp(firebaseConfig);
 const db = firebase.database();
@@ -545,17 +548,35 @@ function curItems() { return itemsByBoard[currentBoardId] || {}; }
 function boardOrderIds() { return Object.keys(boards).sort((a,b) => (boards[a].order||0) - (boards[b].order||0)); }
 
 // --- 4. LIFECYCLE ---
+let appStartupComplete = false;
+let anonymousSignInStarted = false;
 window.addEventListener('load', () => {
   applyDark();
-  const urlParams = new URLSearchParams(window.location.search);
-  const codeFromUrl = urlParams.get('list');
-  const lastUsed = localStorage.getItem('fl-last-list');
+  firebase.auth().onAuthStateChanged(user => {
+    if (!user) {
+      if (!anonymousSignInStarted) {
+        anonymousSignInStarted = true;
+        firebase.auth().signInAnonymously().catch(error => {
+          console.error("Firebase sign-in failed:", error.code || "unknown error");
+          const subtitle = document.querySelector('#landing .landing-sub');
+          if (subtitle) subtitle.textContent = "Couldn't connect securely. Please refresh and try again.";
+        });
+      }
+      return;
+    }
+    if (appStartupComplete) return;
+    appStartupComplete = true;
 
-  if (codeFromUrl) {
-    enterList(codeFromUrl.toUpperCase());
-  } else if (lastUsed) {
-    enterList(lastUsed.toUpperCase());
-  }
+    const urlParams = new URLSearchParams(window.location.search);
+    const codeFromUrl = urlParams.get('list');
+    const lastUsed = localStorage.getItem('fl-last-list');
+
+    if (codeFromUrl) {
+      enterList(codeFromUrl.toUpperCase());
+    } else if (lastUsed) {
+      enterList(lastUsed.toUpperCase());
+    }
+  });
 });
 document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeMenu(); });
 
@@ -564,9 +585,21 @@ function showPage(id) {
   document.getElementById(id).classList.add('active');
 }
 
-function createNewList() {
+async function createNewList() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
-  enterList(Array.from({length:6}, () => chars[Math.floor(Math.random()*chars.length)]).join(''));
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const randomBytes = new Uint8Array(12);
+    crypto.getRandomValues(randomBytes);
+    const code = Array.from(randomBytes, byte => chars[byte % chars.length]).join('');
+    const result = await db.ref(`lists/${code}`).transaction(current =>
+      current === null ? { createdAt: Date.now() } : undefined
+    );
+    if (result.committed) {
+      enterList(code);
+      return;
+    }
+  }
+  alert("Couldn't create a new list. Please try again.");
 }
 
 function toggleJoin() {
@@ -609,17 +642,22 @@ function switchList() {
 
 // --- 5. BOARDS (the lists living inside one shareable code) ---
 async function seedDefaultBoards() {
-  const updates = {};
+  const defaults = {};
   DEFAULT_BOARD_ORDER.forEach((key, i) => {
-    updates[key] = { name: LIST_TYPES[key].label, type: key, order: i, createdAt: Date.now() };
+    defaults[key] = { name: LIST_TYPES[key].label, type: key, order: i, createdAt: Date.now() };
   });
-  await db.ref(`lists/${listId}/boards`).set(updates);
-  // Best-effort migration from the pre-"boards" data model (lists/{code}/{type}/items)
+  const boardsPath = db.ref(`lists/${listId}/boards`);
+  await boardsPath.transaction(current => current === null ? defaults : undefined);
+
+  // Best-effort migration from the pre-"boards" data model (lists/{code}/{type}/items).
   for (const key of DEFAULT_BOARD_ORDER) {
     try {
       const legacySnap = await db.ref(`lists/${listId}/${key}/items`).once('value');
       const legacyItems = legacySnap.val();
-      if (legacyItems) await db.ref(`lists/${listId}/boards/${key}/items`).set(legacyItems);
+      if (legacyItems) {
+        const target = db.ref(`lists/${listId}/boards/${key}/items`);
+        await target.transaction(current => current === null ? legacyItems : undefined);
+      }
     } catch (e) { /* ignore — nothing to migrate */ }
   }
 }
@@ -686,7 +724,7 @@ function renderTabs() {
     const b = boards[id];
     const cfg = LIST_TYPES[b.type] || LIST_TYPES.custom;
     const count = Object.keys(itemsByBoard[id] || {}).length;
-    return `<button class="type-tab${id === currentBoardId ? ' active' : ''}" data-id="${id}" onclick="selectBoard('${id}')">
+    return `<button class="type-tab${id === currentBoardId ? ' active' : ''}" data-id="${escapeHTML(id)}" onclick="selectBoard(${jsArg(id)})">
       <span>${cfg.icon}</span><span>${escapeHTML(b.name)}</span>${count ? `<span class="tab-badge">${count}</span>` : ''}
     </button>`;
   }).join('');
@@ -721,8 +759,8 @@ function renderReorderList() {
     return `<div class="reorder-item">
       <div class="reorder-name"><span>${cfg.icon}</span><span>${escapeHTML(b.name)}</span></div>
       <div class="reorder-arrows">
-        <button class="reorder-btn" ${i === 0 ? 'disabled' : ''} onclick="moveBoard('${id}',-1)">↑</button>
-        <button class="reorder-btn" ${i === ids.length - 1 ? 'disabled' : ''} onclick="moveBoard('${id}',1)">↓</button>
+        <button class="reorder-btn" ${i === 0 ? 'disabled' : ''} onclick="moveBoard(${jsArg(id)},-1)">↑</button>
+        <button class="reorder-btn" ${i === ids.length - 1 ? 'disabled' : ''} onclick="moveBoard(${jsArg(id)},1)">↓</button>
       </div>
     </div>`;
   }).join('');
@@ -829,52 +867,70 @@ async function addItems() {
   btn.textContent = '⏳ Categorizing...';
   err.style.display = 'none';
 
+  let itemList;
   try {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: rawValue, type: board.type })
+      body: JSON.stringify({ text: rawValue, type: board.type, today: getLocalISODate() })
     });
+    if (!response.ok) throw new Error("Parser unavailable");
 
-    if (!response.ok) throw new Error("API Offline");
-
-    const rawData = await response.json();
-    const itemList = rawData.items || [];
-
-    if (itemList.length === 0) throw new Error("No items parsed");
-
-    for (const item of itemList) {
-      await db.ref(`lists/${listId}/boards/${currentBoardId}/items`).push({
-        name: item.name || "Unknown Item",
-        quantity: item.quantity || 1,
-        unit: item.unit || "",
-        category: item.category || fallbackCategory(),
+    const data = await response.json();
+    if (!data || !Array.isArray(data.items) || data.items.length === 0 || data.items.length > 50) {
+      throw new Error("Invalid parser response");
+    }
+    itemList = data.items.map(item => {
+      const validCategories = cfg.cats.length ? cfg.cats : ['General'];
+      if (!item || typeof item.name !== 'string' || !item.name.trim() ||
+          !Number.isInteger(item.quantity) || item.quantity < 1 || item.quantity > 999 ||
+          typeof item.unit !== 'string' || item.unit.length > 30 ||
+          typeof item.emoji !== 'string' || item.emoji.length > 16 ||
+          !validCategories.includes(item.category) ||
+          (board.type === 'todo' &&
+            (typeof item.dueDate !== 'string' ||
+             (item.dueDate !== '' && !/^\d{4}-\d{2}-\d{2}$/.test(item.dueDate))))) {
+        throw new Error("Invalid parser item");
+      }
+      return {
+        name: item.name.trim().slice(0, 100),
+        quantity: item.quantity,
+        unit: item.unit,
+        category: item.category,
         emoji: item.emoji || "📦",
-        dueDate: item.dueDate || "",
+        dueDate: board.type === 'todo' ? item.dueDate : "",
         checked: false,
         addedAt: Date.now()
-      });
-    }
-    input.value = "";
-    input.focus();
-  } catch (e) {
-    console.error("AI Parse Error, using Fallback:", e);
-    const splitItems = rawValue.split(',').map(s => s.trim()).filter(s => s.length > 0);
-    for (const name of splitItems) {
-        await db.ref(`lists/${listId}/boards/${currentBoardId}/items`).push({
-            name: name,
-            quantity: 1,
-            unit: "",
-            category: fallbackCategory(),
-            emoji: "📦",
-            checked: false,
-            addedAt: Date.now()
-        });
-    }
-    input.value = "";
-    err.textContent = "Added items manually (AI categorized failed)";
+      };
+    });
+  } catch (parseError) {
+    console.error("AI parse failed; using manual fallback:", parseError);
+    itemList = rawValue.split(',').map(name => name.trim()).filter(Boolean).slice(0, 50).map(name => ({
+      name,
+      quantity: 1,
+      unit: "",
+      category: fallbackCategory(),
+      emoji: "📦",
+      dueDate: "",
+      checked: false,
+      addedAt: Date.now()
+    }));
+    err.textContent = "AI categorization failed; added items manually.";
     err.style.display = 'block';
     setTimeout(() => { err.style.display = 'none'; }, 3000);
+  }
+
+  try {
+    const itemsRef = db.ref(`lists/${listId}/boards/${currentBoardId}/items`);
+    const updates = {};
+    itemList.forEach(item => { updates[itemsRef.push().key] = item; });
+    await itemsRef.update(updates);
+    input.value = "";
+    input.focus();
+  } catch (saveError) {
+    console.error("Could not save items:", saveError);
+    err.textContent = "Could not save items. Please try again.";
+    err.style.display = 'block';
   } finally {
     btn.disabled = false;
     btn.textContent = cfg.addBtnLabel;
@@ -946,8 +1002,11 @@ function renderList() {
 }
 
 function formatDueBadge(dateStr) {
-  const d = new Date(dateStr + 'T00:00:00');
-  if (isNaN(d.getTime())) return '';
+  if (typeof dateStr !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(dateStr)) return '';
+  const [year, month, day] = dateStr.split('-').map(Number);
+  const d = new Date(year, month - 1, day);
+  if (isNaN(d.getTime()) || d.getFullYear() !== year ||
+      d.getMonth() !== month - 1 || d.getDate() !== day) return '';
   const today = new Date(); today.setHours(0,0,0,0);
   const diffDays = Math.round((d - today) / 86400000);
   const label = d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
@@ -964,40 +1023,57 @@ function escapeHTML(str) {
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 }
+function jsArg(value) {
+  return escapeHTML(JSON.stringify(String(value)));
+}
+function getLocalISODate() {
+  const now = new Date();
+  const pad = value => String(value).padStart(2, '0');
+  return now.getFullYear() + '-' + pad(now.getMonth() + 1) + '-' + pad(now.getDate());
+}
 function itemHTML(item, cfg) {
-  const qtyLabel = (cfg.hasQty && item.quantity > 1) ? `<span class="item-qty">${item.quantity}${item.unit?' '+item.unit:''}×</span>` : '';
-  const noteLine = item.note ? `<div class="item-note">${escapeHTML(item.note)}</div>` : '';
-  const dueBadge = (cfg.hasDueDates && item.dueDate) ? formatDueBadge(item.dueDate) : '';
+  const safeId = escapeHTML(String(item.id));
+  const idArg = jsArg(item.id);
+  const quantity = Number.isInteger(item.quantity) ? Math.min(999, Math.max(1, item.quantity)) : 1;
+  const unit = typeof item.unit === 'string' ? item.unit.slice(0, 30) : '';
+  const name = typeof item.name === 'string' ? item.name : '';
+  const emoji = typeof item.emoji === 'string' ? item.emoji : '📦';
+  const note = typeof item.note === 'string' ? item.note : '';
+  const qtyLabel = (cfg.hasQty && quantity > 1)
+    ? `<span class="item-qty">${quantity}${unit ? ' ' + escapeHTML(unit) : ''}×</span>` : '';
+  const noteLine = note ? `<div class="item-note">${escapeHTML(note)}</div>` : '';
+  const dueBadge = (cfg.hasDueDates && typeof item.dueDate === 'string' && item.dueDate)
+    ? formatDueBadge(item.dueDate) : '';
   const qtyRow = cfg.hasQty ? `<div class="qty-row">
         <span class="qty-label">Qty</span>
         <div class="qty-controls">
-          <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',-1)">−</button>
-          <input class="qty-input" id="qi-${item.id}" value="${item.quantity}" type="number" min="1"
-            onkeydown="if(event.key==='Enter')saveEdit('${item.id}')">
-          <button class="qty-btn" onclick="event.stopPropagation();adj('${item.id}',1)">+</button>
+          <button class="qty-btn" onclick="event.stopPropagation();adj(${idArg},-1)">−</button>
+          <input class="qty-input" id="qi-${safeId}" value="${quantity}" type="number" min="1" max="999"
+            onkeydown="if(event.key==='Enter')saveEdit(${idArg})">
+          <button class="qty-btn" onclick="event.stopPropagation();adj(${idArg},1)">+</button>
         </div>
       </div>` : '';
-  return `<div class="item-wrap" id="wrap-${item.id}">
-    <div class="item-row${item.checked?' checked':''}" id="row-${item.id}" onclick="toggleItem('${item.id}')">
+  return `<div class="item-wrap" id="wrap-${safeId}">
+    <div class="item-row${item.checked?' checked':''}" id="row-${safeId}" onclick="toggleItem(${idArg})">
       <div class="item-checkbox${item.checked?' checked':''}">${item.checked?'✓':''}</div>
-      <span class="item-emoji">${escapeHTML(item.emoji)}</span>
+      <span class="item-emoji">${escapeHTML(emoji)}</span>
       <div class="item-text">
-        <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(item.name)}</span>
+        <span class="item-name${item.checked?' checked':''}">${qtyLabel}${escapeHTML(name)}</span>
         ${noteLine}
       </div>
       ${dueBadge}
     </div>
     <div class="swipe-hint">← delete · edit →</div>
-    <div class="edit-panel" id="ep-${item.id}">
+    <div class="edit-panel" id="ep-${safeId}">
       ${qtyRow}
       <div class="note-row">
         <span class="qty-label">Note</span>
-        <input class="note-input" id="ni-${item.id}" value="${escapeHTML(item.note||'')}" placeholder="optional note..."
-          onkeydown="if(event.key==='Enter')saveEdit('${item.id}')">
+        <input class="note-input" id="ni-${safeId}" value="${escapeHTML(note)}" placeholder="optional note..."
+          onkeydown="if(event.key==='Enter')saveEdit(${idArg})">
       </div>
       <div class="qty-actions">
-        <button class="btn-save" onclick="event.stopPropagation();saveEdit('${item.id}')">✓ Save</button>
-        <button class="btn-cancel" onclick="event.stopPropagation();closeEdit('${item.id}')">Cancel</button>
+        <button class="btn-save" onclick="event.stopPropagation();saveEdit(${idArg})">✓ Save</button>
+        <button class="btn-cancel" onclick="event.stopPropagation();closeEdit(${idArg})">Cancel</button>
       </div>
     </div>
   </div>`;
@@ -1117,7 +1193,7 @@ async function recategorizeOther() {
     const response = await fetch('/api/parse', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ text: namesString, type: board.type })
+      body: JSON.stringify({ text: namesString, type: board.type, today: getLocalISODate() })
     });
 
     if (!response.ok) throw new Error("Retry failed");
