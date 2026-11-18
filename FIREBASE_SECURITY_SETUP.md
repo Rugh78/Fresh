@@ -14,4 +14,4 @@ The rules deny direct root reads and writes, and require a Firebase-authenticate
 
 Configure a Cloudflare rate-limiting rule for `POST /api/parse` (for example, 20 requests per minute per IP). The function limits request size and input length, but a reliable per-IP limit must be configured at the edge.
 
-The Firebase Console account used during this change did not have permission to manage sign-in methods, so Anonymous sign-in and the live database rules were not changed here.
+A project owner must enable Anonymous sign-in. The live database rules should be published after the updated app is deployed.
