@@ -138,6 +138,17 @@ const MAX_BODY_BYTES = 10000;
 const MAX_INPUT_LENGTH = 1000;
 const MAX_ITEMS = 50;
 
+function knownGroceryItem(value) {
+  // Match only the complete product name, so frozen/flavored/non-dairy products
+  // and unrelated products containing "yogurt" still go through the model.
+  const name = value.normalize("NFKC").trim().toLowerCase().replace(/[.!?]+$/, "").trim();
+  const match = /^(?:(\d+)\s+)?(yogurt|yogurts|yoghurt|yoghurts|yogur|yogures|יוגורט|יוגורטים)$/.exec(name);
+  if (!match) return null;
+  const quantity = match[1] ? Number(match[1]) : 1;
+  if (!Number.isInteger(quantity) || quantity < 1 || quantity > 999) return null;
+  return { name: "Yogurt", quantity, unit: "", category: "Dairy", emoji: "🥛", dueDate: "" };
+}
+
 function itemResponseFormat(listType) {
   return {
     type: "json_schema",
@@ -228,6 +239,20 @@ export async function onRequest(context) {
   if (!Object.prototype.hasOwnProperty.call(SYSTEM_PROMPTS, listType)) {
     return jsonResponse({ error: "Unsupported list type" }, 400, origin);
   }
+
+  const knownItems = [];
+  let modelText = text;
+  if (listType === "grocery") {
+    const remaining = [];
+    for (const part of text.split(/[,\n\u060c]+/).map(value => value.trim()).filter(Boolean)) {
+      const known = knownGroceryItem(part);
+      if (known) knownItems.push(known);
+      else remaining.push(part);
+    }
+    if (knownItems.length > MAX_ITEMS) return jsonResponse({ error: "Too many items (maximum 50)" }, 413, origin);
+    if (!remaining.length && knownItems.length) return jsonResponse({ items: knownItems }, 200, origin);
+    modelText = remaining.join(", ");
+  }
   if (!env.GROQ_API_KEY) {
     console.error("GROQ_API_KEY is not configured");
     return jsonResponse({ error: "Parser is temporarily unavailable" }, 503, origin);
@@ -254,7 +279,7 @@ export async function onRequest(context) {
         model: "openai/gpt-oss-20b",
         messages: [
           { role: "system", content: systemContent },
-          { role: "user", content: text }
+          { role: "user", content: modelText }
         ],
         temperature: 0,
         response_format: itemResponseFormat(listType)
@@ -273,7 +298,7 @@ export async function onRequest(context) {
 
     const parsed = JSON.parse(content);
     if (!parsed || !Array.isArray(parsed.items) ||
-        parsed.items.length === 0 || parsed.items.length > MAX_ITEMS) {
+        parsed.items.length === 0 || parsed.items.length + knownItems.length > MAX_ITEMS) {
       throw new Error("Invalid model response");
     }
 
@@ -308,7 +333,7 @@ export async function onRequest(context) {
       return normalized;
     });
 
-    return jsonResponse({ items }, 200, origin);
+    return jsonResponse({ items: [...knownItems, ...items] }, 200, origin);
   } catch (error) {
     console.error("Parser request failed:", error && error.name ? error.name : "Error");
     return jsonResponse({ error: "Could not parse the items. Please try again." }, 502, origin);
