@@ -6,6 +6,7 @@ Rules:
 - ALWAYS output the item name in English, regardless of the input language. Translate Hebrew/Arabic/etc. to English.
 - If an item is written ONLY as emoji(s), convert it to a clear TEXT name in English (e.g., 🍋 → "Lemon"). Keep the emoji field as the emoji. If the same emoji is repeated (e.g., 🌽🌽), set quantity equal to the count of repeated emojis and keep a single text name (e.g., "Corn").
 - Choose the correct category based on what the item IS, regardless of language.
+- Dairy includes milk, cheese, butter, cream and yogurt. Yogurt, yoghurt, yogur, yogures, יוגורט and יוגורטים mean yogurt: use the English name "Yogurt" and category "Dairy". Preserve explicitly mentioned flavors and quantities. Frozen yogurt belongs in Frozen; explicitly plant-based yogurt belongs in Other.
 - Pick an appropriate emoji for the item.
 - Infer quantity from context (e.g. "2 חלב" → quantity 2, name "חלב").
 
@@ -137,6 +138,39 @@ const MAX_BODY_BYTES = 10000;
 const MAX_INPUT_LENGTH = 1000;
 const MAX_ITEMS = 50;
 
+function itemResponseFormat(listType) {
+  return {
+    type: "json_schema",
+    json_schema: {
+      name: "parsed_list_items",
+      strict: true,
+      schema: {
+        type: "object",
+        additionalProperties: false,
+        required: ["items"],
+        properties: {
+          items: {
+            type: "array",
+            items: {
+              type: "object",
+              additionalProperties: false,
+              required: ["name", "quantity", "unit", "category", "emoji", "dueDate"],
+              properties: {
+                name: { type: "string" },
+                quantity: { type: "integer" },
+                unit: { type: "string" },
+                category: { type: "string", enum: ALLOWED_CATEGORIES[listType] },
+                emoji: { type: "string" },
+                dueDate: listType === "todo" ? { type: "string" } : { type: "string", enum: [""] }
+              }
+            }
+          }
+        }
+      }
+    }
+  };
+}
+
 export async function onRequest(context) {
   const { request, env } = context;
   const origin = request.headers.get("Origin");
@@ -223,7 +257,7 @@ export async function onRequest(context) {
           { role: "user", content: text }
         ],
         temperature: 0,
-        response_format: { type: "json_object" }
+        response_format: itemResponseFormat(listType)
       })
     });
 
