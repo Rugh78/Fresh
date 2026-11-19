@@ -47,6 +47,12 @@
   /* Pages */
   .page { display:none; min-height:100vh; }
   .page.active { display:block; }
+  #startup { align-items:center; justify-content:center; flex-direction:column; gap:14px; padding:24px; text-align:center; color:var(--text-muted); }
+  #startup.active { display:flex; }
+  .startup-spinner { width:28px; height:28px; border:3px solid var(--border); border-top-color:var(--accent); border-radius:50%; animation:spin .8s linear infinite; }
+  #startupRetry { width:auto; margin:0; padding:10px 20px; }
+  #startup [hidden] { display:none; }
+  @media (prefers-reduced-motion:reduce) { .startup-spinner { animation:none; } }
 
   /* ── LANDING ── */
   #landing {
@@ -311,7 +317,13 @@
 </head>
 <body>
 
-<div id="landing" class="page active">
+<div id="startup" class="page active" aria-busy="true">
+  <div class="startup-spinner" id="startupSpinner" aria-hidden="true"></div>
+  <div id="startupMessage" role="status">Opening FreshList...</div>
+  <button type="button" class="btn-secondary" id="startupRetry" hidden onclick="window.location.reload()">Try again</button>
+</div>
+
+<div id="landing" class="page">
   <div class="landing-icon">🛒</div>
   <div class="landing-title">FreshList</div>
   <div class="landing-sub">One shared, live code — with as many lists as you need</div>
@@ -573,22 +585,35 @@ function boardOrderIds() { return Object.keys(boards).sort((a,b) => (boards[a].o
 // --- 4. LIFECYCLE ---
 let appStartupComplete = false;
 let anonymousSignInStarted = false;
-window.addEventListener('load', () => {
+let startupTimer;
+function showStartupError() {
+  clearTimeout(startupTimer);
+  document.getElementById('startup').setAttribute('aria-busy', 'false');
+  document.getElementById('startupSpinner').hidden = true;
+  document.getElementById('startupMessage').textContent = "Couldn't connect securely. Check your connection and try again.";
+  document.getElementById('startupRetry').hidden = false;
+}
+
+function initializeApp() {
   applyDark();
+  startupTimer = setTimeout(() => {
+    if (!appStartupComplete) showStartupError();
+  }, 20000);
   firebase.auth().onAuthStateChanged(user => {
     if (!user) {
       if (!anonymousSignInStarted) {
         anonymousSignInStarted = true;
         firebase.auth().signInAnonymously().catch(error => {
           console.error("Firebase sign-in failed:", error.code || "unknown error");
-          const subtitle = document.querySelector('#landing .landing-sub');
-          if (subtitle) subtitle.textContent = "Couldn't connect securely. Please refresh and try again.";
+          showStartupError();
         });
       }
       return;
     }
     if (appStartupComplete) return;
     appStartupComplete = true;
+    clearTimeout(startupTimer);
+    document.getElementById('startup').setAttribute('aria-busy', 'false');
 
     const urlParams = new URLSearchParams(window.location.search);
     const codeFromUrl = urlParams.get('list');
@@ -598,9 +623,13 @@ window.addEventListener('load', () => {
       enterList(codeFromUrl.toUpperCase());
     } else if (lastUsed) {
       enterList(lastUsed.toUpperCase());
+    } else {
+      showPage('landing');
     }
-  });
-});
+  }, showStartupError);
+}
+// This script is after the page markup: do not wait for fonts and images to load.
+initializeApp();
 document.addEventListener('click', e => { if (!e.target.closest('.menu-wrap')) closeMenu(); });
 
 function showPage(id) {
